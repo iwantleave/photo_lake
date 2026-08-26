@@ -1,0 +1,85 @@
+<%- include('partials/nav', {active:'folders', title:'文件夹管理'}) %>
+<div class="topbar">
+  <div>
+    <div class="crumb">Photo World / 文件夹</div>
+    <h1 class="page-title">文件夹管理</h1>
+    <div class="page-sub">添加本机文件夹，系统将自动扫描并解析其中所有照片与视频</div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="scroll-add">+ 添加文件夹</button>
+  </div>
+</div>
+<div class="content">
+  <div class="card pad" style="margin-bottom:28px">
+    <h2 style="font-size:15px;margin:0 0 16px">添加文件夹</h2>
+    <form id="add-form" class="form-grid">
+      <div class="field" style="flex:1;min-width:320px"><span>文件夹绝对路径</span><input type="text" id="f-path" placeholder="如 D:\Photos 或 /Users/me/Pictures" required></div>
+      <div class="field"><span>别名（可选）</span><input type="text" id="f-alias" placeholder="自定义显示名"></div>
+      <button type="submit" class="btn">添加并扫描</button>
+    </form>
+    <div id="add-msg" class="msg" style="margin-top:12px"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>已管理文件夹</h2></div>
+    <div class="card">
+      <table class="tbl">
+        <thead><tr><th>ID</th><th>路径</th><th>别名</th><th>图片</th><th>视频</th><th>实况</th><th>扫描状态</th><th>最后扫描</th><th></th></tr></thead>
+        <tbody id="folder-rows">
+        <% folders.forEach(function(f){ %>
+          <tr data-id="<%= f.id %>">
+            <td class="num"><%= f.id %></td>
+            <td class="mono"><%= f.path %></td>
+            <td><%= f.alias || '' %></td>
+            <td class="num"><%= f.image_count %></td>
+            <td class="num"><%= f.video_count %></td>
+            <td class="num"><%= f.livephoto_count %></td>
+            <td><span class="badge <%= f.scan_status %>"><%= f.scan_status %></span></td>
+            <td><%= f.last_scan_at ? f.last_scan_at.slice(0,19).replace('T',' ') : '-' %></td>
+            <td class="ops">
+              <button class="btn-sm" data-act="rescan" data-id="<%= f.id %>">重扫</button>
+              <button class="btn-sm danger" data-act="remove" data-id="<%= f.id %>">移除</button>
+            </td>
+          </tr>
+        <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<%- include('partials/foot') %>
+<script>
+async function api(method, url, body){
+  const opt = { method, headers:{} };
+  if(body){ opt.headers['Content-Type']='application/json'; opt.body=JSON.stringify(body); }
+  const r = await fetch(url, opt);
+  const data = await r.json().catch(()=>({error:'响应解析失败'}));
+  if(!r.ok) throw new Error(data.error || ('HTTP '+r.status));
+  return data;
+}
+const msg = document.getElementById('add-msg');
+document.getElementById('add-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  msg.textContent = '提交中…'; msg.className='msg';
+  try{
+    await api('POST','/api/folders',{ path: document.getElementById('f-path').value, alias: document.getElementById('f-alias').value });
+    msg.textContent = '已添加，扫描任务已启动。'; msg.className='msg ok';
+    setTimeout(()=>location.reload(), 600);
+  }catch(err){
+    msg.textContent = err.message; msg.className='msg err';
+  }
+});
+document.getElementById('folder-rows').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-act]'); if(!btn) return;
+  const id = btn.dataset.id, act = btn.dataset.act;
+  if(act==='rescan'){
+    await api('POST','/api/folders/'+id+'/rescan'); location.reload();
+  } else if(act==='remove'){
+    if(!confirm('确认移除？仅删除系统记录，不删除磁盘文件。')) return;
+    await api('DELETE','/api/folders/'+id); location.reload();
+  }
+});
+document.getElementById('scroll-add').addEventListener('click', ()=>document.getElementById('f-path').focus());
+</script>
+</body>
+</html>

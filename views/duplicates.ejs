@@ -1,0 +1,18 @@
+<%- include('partials/nav', {active:'dup', title:'重复文件'}) %>
+<div class="topbar">
+  <div>
+    <div class="crumb">Photo World / 重复</div>
+    <h1 class="page-title">重复文件</h1>
+    <div class="page-sub">按 MD5 分组，每组保留一份即可，识别可清理的浪费空间</div>
+  </div>
+</div>
+<div class="content">
+  <div class="card pad">
+    <p class="muted" style="margin-top:0">基于 MD5 标记内容重复的文件组（照片与视频统一规则）。标记清理功能将在后续版本支持。</p>
+    <div id="dup-body"></div>
+  </div>
+</div>
+<%- include('partials/foot') %>
+<script src="/app.js"></script>
+</body>
+</html>

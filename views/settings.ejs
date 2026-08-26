@@ -1,0 +1,105 @@
+<%- include('partials/nav', {active:'settings', title:'系统设置'}) %>
+<div class="topbar">
+  <div>
+    <div class="crumb">Photo World / 设置</div>
+    <h1 class="page-title">系统设置</h1>
+    <div class="page-sub">配置 ffmpeg / ffprobe 路径与扫描行为，修改即时生效</div>
+  </div>
+</div>
+<div class="content">
+  <div class="badge-row">
+    ffprobe：<span class="badge <%= ffprobe.ok?'ok':'missing' %>"><%= ffprobe.ok ? ('可用 '+ffprobe.version) : '未配置/无效' %></span>
+    ffmpeg：<span class="badge <%= ffmpeg.ok?'ok':'missing' %>"><%= ffmpeg.ok ? ('可用 '+ffmpeg.version) : '未配置/无效' %></span>
+  </div>
+
+  <div class="card pad" style="margin-bottom:24px">
+    <h2 style="font-size:15px;margin:0 0 16px">ffmpeg / ffprobe 路径</h2>
+    <div class="form-grid">
+      <div class="field" style="flex:1;min-width:320px"><span>ffprobe 路径</span><input type="text" id="ffprobePath" value="<%= settings.ffprobePath||'' %>" placeholder="如 C:\ffmpeg\bin\ffprobe.exe，或留空用 PATH"></div>
+      <button class="icon-btn" id="test-ffprobe">测试 ffprobe</button>
+      <span id="ffprobe-result" class="msg"></span>
+    </div>
+    <div class="form-grid" style="margin-top:16px">
+      <div class="field" style="flex:1;min-width:320px"><span>ffmpeg 路径</span><input type="text" id="ffmpegPath" value="<%= settings.ffmpegPath||'' %>" placeholder="如 C:\ffmpeg\bin\ffmpeg.exe"></div>
+      <button class="icon-btn" id="test-ffmpeg">测试 ffmpeg</button>
+      <span id="ffmpeg-result" class="msg"></span>
+    </div>
+    <% if (degradedCount > 0) { %>
+    <div class="warn" style="margin-top:16px">检测到 <%= degradedCount %> 个视频处于降级状态（ffprobe 未解析）。
+      <button class="icon-btn" id="rescan-degraded">补扫这些视频</button></div>
+    <% } %>
+  </div>
+
+  <div class="card pad">
+    <h2 style="font-size:15px;margin:0 0 16px">扫描设置</h2>
+    <div class="form-grid">
+      <div class="field"><span>图片并发数</span><input type="number" id="imageConcurrency" value="<%= settings.imageConcurrency %>" min="1" max="16"></div>
+      <div class="field"><span>ffprobe 并发数</span><input type="number" id="ffprobeConcurrency" value="<%= settings.ffprobeConcurrency %>" min="1" max="16"></div>
+      <label class="check" style="padding-bottom:9px"><input type="checkbox" id="videoMd5Enabled" <%= settings.videoMd5Enabled?'checked':'' %>> 视频计算 MD5（关闭后视频不参与查重）</label>
+    </div>
+    <div class="form-grid" style="margin-top:16px">
+      <div class="field wide"><span>图片格式白名单（逗号分隔）</span><input type="text" id="imageFormats" value="<%= settings.imageFormats.join(',') %>"></div>
+    </div>
+    <div class="form-grid" style="margin-top:16px">
+      <div class="field wide"><span>视频格式白名单（逗号分隔）</span><input type="text" id="videoFormats" value="<%= settings.videoFormats.join(',') %>"></div>
+    </div>
+    <div class="form-grid" style="margin-top:16px">
+      <div class="field wide"><span>忽略目录名（逗号分隔）</span><input type="text" id="ignoreDirs" value="<%= settings.ignoreDirs.join(',') %>"></div>
+    </div>
+    <div class="form-grid" style="margin-top:16px">
+      <div class="field"><span>每页条数</span><input type="number" id="pageSize" value="<%= settings.pageSize %>"></div>
+      <div class="field"><span>日志级别</span>
+        <select id="logLevel">
+          <option value="info" <%= settings.logLevel==='info'?'selected':'' %>>info</option>
+          <option value="debug" <%= settings.logLevel==='debug'?'selected':'' %>>debug</option>
+        </select></div>
+    </div>
+    <div style="margin-top:20px">
+      <button class="btn" id="save-settings">保存设置</button>
+      <span id="save-result" class="msg" style="margin-left:12px"></span>
+    </div>
+  </div>
+</div>
+<%- include('partials/foot') %>
+<script>
+async function testBin(btnId, resultId, url, pathVal){
+  const btn=document.getElementById(btnId); const res=document.getElementById(resultId);
+  btn.disabled=true; res.textContent='测试中…'; res.className='msg';
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:pathVal()})});
+    const d=await r.json();
+    if(d.ok){ res.textContent='✓ 可用，版本 '+d.version; res.className='msg ok'; }
+    else { res.textContent='✗ 失败：'+(d.error||''); res.className='msg err'; }
+  }catch(e){ res.textContent='✗ 请求失败'; res.className='msg err'; }
+  btn.disabled=false;
+}
+document.getElementById('test-ffprobe').addEventListener('click',()=>testBin('test-ffprobe','ffprobe-result','/api/settings/test-ffprobe',()=>document.getElementById('ffprobePath').value));
+document.getElementById('test-ffmpeg').addEventListener('click',()=>testBin('test-ffmpeg','ffmpeg-result','/api/settings/test-ffmpeg',()=>document.getElementById('ffmpegPath').value));
+
+document.getElementById('save-settings').addEventListener('click',async()=>{
+  const res=document.getElementById('save-result');
+  const payload={
+    ffprobePath:document.getElementById('ffprobePath').value.trim(),
+    ffmpegPath:document.getElementById('ffmpegPath').value.trim(),
+    imageConcurrency:+document.getElementById('imageConcurrency').value,
+    ffprobeConcurrency:+document.getElementById('ffprobeConcurrency').value,
+    videoMd5Enabled:document.getElementById('videoMd5Enabled').checked,
+    imageFormats:document.getElementById('imageFormats').value.split(',').map(s=>s.trim()).filter(Boolean),
+    videoFormats:document.getElementById('videoFormats').value.split(',').map(s=>s.trim()).filter(Boolean),
+    ignoreDirs:document.getElementById('ignoreDirs').value.split(',').map(s=>s.trim()).filter(Boolean),
+    pageSize:+document.getElementById('pageSize').value,
+    logLevel:document.getElementById('logLevel').value
+  };
+  res.textContent='保存中…'; res.className='msg';
+  try{
+    const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(d.ok){ res.textContent='✓ 已保存'; res.className='msg ok'; setTimeout(()=>location.reload(),500); }
+    else res.textContent='✗ 保存失败';
+  }catch(e){ res.textContent='✗ 请求失败'; res.className='msg err'; }
+});
+const rb=document.getElementById('rescan-degraded');
+if(rb) rb.addEventListener('click',async()=>{ await fetch('/api/settings/rescan-degraded',{method:'POST'}); alert('已触发补扫，请到任务页查看进度'); location.href='/jobs'; });
+</script>
+</body>
+</html>

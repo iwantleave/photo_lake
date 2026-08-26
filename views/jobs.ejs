@@ -1,0 +1,20 @@
+<%- include('partials/nav', {active:'jobs', title:'扫描任务'}) %>
+<div class="topbar">
+  <div>
+    <div class="crumb">Photo World / 任务</div>
+    <h1 class="page-title">扫描任务</h1>
+    <div class="page-sub">查看扫描进度、状态与摘要，进行中的任务可取消</div>
+  </div>
+</div>
+<div class="content">
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>任务ID</th><th>文件夹</th><th>状态</th><th>进度</th><th>新增 / 更新 / 失败</th><th>开始</th><th>结束</th><th></th></tr></thead>
+      <tbody id="job-body"></tbody>
+    </table>
+  </div>
+</div>
+<%- include('partials/foot') %>
+<script src="/app.js"></script>
+</body>
+</html>

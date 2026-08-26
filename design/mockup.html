@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photo World · 设计方案原型</title>
+<style>
+  :root{
+    --bg:#0d0f14;            /* 主内容背景 */
+    --sidebar:#12151d;       /* 侧栏背景 */
+    --panel:#161a23;         /* 卡片/面板 */
+    --panel-2:#1b202b;       /* 次级面板/行悬停 */
+    --border:#262c38;
+    --border-strong:#333b4a;
+    --text:#eef1f7;
+    --muted:#8b93a7;
+    --muted-2:#6b7283;
+    --accent:#5b8cff;
+    --accent-soft:rgba(91,140,255,.12);
+    --ok:#3fb950;
+    --warn:#e3a008;
+    --err:#f85149;
+    --live:#bc6cff;
+    --radius:14px;
+    --radius-sm:10px;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.18);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none}
+
+  /* ===== 布局 ===== */
+  .app{display:flex; min-height:100vh}
+  .sidebar{
+    width:248px; flex:0 0 248px; background:var(--sidebar);
+    border-right:1px solid var(--border);
+    display:flex; flex-direction:column; padding:22px 16px; position:sticky; top:0; height:100vh;
+  }
+  .brand{display:flex; align-items:center; gap:11px; padding:6px 8px 22px; font-size:17px; font-weight:700; letter-spacing:.2px}
+  .brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#8a5bff);display:grid;place-items:center;font-size:18px;box-shadow:0 4px 14px rgba(91,140,255,.4)}
+  .nav-group-label{font-size:11px; color:var(--muted-2); text-transform:uppercase; letter-spacing:.12em; padding:14px 10px 8px; font-weight:600}
+  .nav a{display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:10px; color:var(--muted); font-size:14px; font-weight:500; margin-bottom:3px; transition:.15s}
+  .nav a svg{width:18px;height:18px;opacity:.85}
+  .nav a:hover{background:var(--panel); color:var(--text)}
+  .nav a.active{background:var(--accent-soft); color:#cfe0ff; box-shadow:inset 0 0 0 1px rgba(91,140,255,.35)}
+  .nav a.active svg{opacity:1}
+  .sidebar .spacer{flex:1}
+  .sidebar .foot{font-size:12px;color:var(--muted-2);padding:10px 12px;border-top:1px solid var(--border)}
+
+  .main{flex:1; min-width:0; display:flex; flex-direction:column}
+  .topbar{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:20px;
+    padding:30px 44px 22px; border-bottom:1px solid var(--border);
+  }
+  .crumb{font-size:12px;color:var(--muted-2);margin-bottom:7px;letter-spacing:.03em}
+  .page-title{font-size:26px;font-weight:700;margin:0;letter-spacing:.2px}
+  .page-sub{font-size:13px;color:var(--muted);margin-top:6px}
+  .topbar .actions{display:flex;gap:10px;align-items:center}
+  .btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:10px 18px;font-size:13.5px;font-weight:600;cursor:pointer;transition:.15s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--border-strong)}
+  .btn.ghost:hover{background:var(--panel-2)}
+
+  .content{padding:30px 44px 48px; max-width:1500px}
+
+  /* ===== 统计卡片 ===== */
+  .stats{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:18px; margin-bottom:34px}
+  .stat{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:22px 24px; position:relative; overflow:hidden}
+  .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);opacity:.0}
+  .stat.accent::before{opacity:.9}
+  .stat .label{font-size:13px;color:var(--muted);margin-bottom:10px;font-weight:500}
+  .stat .value{font-size:30px;font-weight:700;letter-spacing:.5px;line-height:1}
+  .stat .value small{font-size:14px;font-weight:500;color:var(--muted);margin-left:4px}
+  .stat .hint{font-size:12px;color:var(--muted-2);margin-top:8px}
+
+  /* ===== 区块 / 表格 ===== */
+  .section{margin-bottom:36px}
+  .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .section-head h2{font-size:16px;font-weight:600;margin:0}
+  .section-head .link{font-size:13px;color:var(--accent)}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  thead th{text-align:left;font-size:12px;font-weight:600;color:var(--muted);padding:14px 18px;border-bottom:1px solid var(--border);white-space:nowrap}
+  tbody td{padding:15px 18px;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:var(--panel-2)}
+  td.mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:12.5px;color:var(--muted)}
+  td.num{font-variant-numeric:tabular-nums}
+
+  .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted)}
+  .badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .badge.ok,.badge.done{color:var(--ok);border-color:rgba(63,185,80,.4)}
+  .badge.scanning,.badge.running{color:var(--accent);border-color:rgba(91,140,255,.4)}
+  .badge.failed,.badge.missing{color:var(--err);border-color:rgba(248,81,73,.4)}
+  .badge.degraded{color:var(--warn);border-color:rgba(227,160,8,.4)}
+  .badge.live{color:var(--live);border-color:rgba(188,108,255,.4)}
+
+  .icon-btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:6px 12px;font-size:12.5px;cursor:pointer}
+  .icon-btn:hover{background:var(--border)}
+
+  /* ===== 筛选面板 ===== */
+  .filter-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:24px}
+  .filter-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+  .filter-head .title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .filter-head .tools{display:flex;gap:8px;align-items:center}
+  .filter-body{padding:20px;display:flex;flex-direction:column;gap:22px}
+  .fgroup{border-left:2px solid var(--border-strong);padding-left:16px}
+  .fgroup .glabel{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+  .frow{display:flex;flex-wrap:wrap;gap:14px 18px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field > span{font-size:12px;color:var(--muted)}
+  .field input,.field select{
+    background:var(--bg); color:var(--text); border:1px solid var(--border-strong);
+    border-radius:9px; padding:9px 11px; font-size:13px; min-width:150px;
+  }
+  .field input:focus,.field select:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .field.search input{min-width:320px}
+  .checkrow{display:flex;flex-wrap:wrap;gap:18px;padding-top:4px}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer;user-select:none}
+  .check input{width:16px;height:16px;accent-color:var(--accent)}
+  .filter-foot{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid var(--border)}
+  .filter-foot .meta{font-size:12.5px;color:var(--muted)}
+
+  /* ===== 分页 ===== */
+  .pager{display:flex;align-items:center;justify-content:space-between;margin-top:18px;gap:14px}
+  .pager .left{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+  .pager .right{display:flex;align-items:center;gap:10px}
+
+  /* ===== 工具提示徽标 ===== */
+  .tag-live{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11.5px;font-weight:600;background:rgba(188,108,255,.15);color:var(--live)}
+
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- 侧栏 -->
+  <aside class="sidebar">
+    <div class="brand"><span class="logo">📷</span> Photo World</div>
+    <div class="nav-group-label">管理</div>
+    <nav class="nav">
+      <a href="#" data-view="overview" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        概览</a>
+      <a href="#" data-view="folders">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        文件夹</a>
+      <a href="#" data-view="media">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>
+        媒体</a>
+      <a href="#" data-view="dup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="13" height="13" rx="2"/><path d="M8 8h11a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2z"/></svg>
+        重复</a>
+      <a href="#" data-view="jobs">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/></svg>
+        任务</a>
+    </nav>
+    <div class="nav-group-label">系统</div>
+    <nav class="nav">
+      <a href="#" data-view="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 7 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0-1.1-2.7H1a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 2.6 7a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 7 2.6h.1A1.6 1.6 0 0 0 8 1.1V1a2 2 0 1 1 4 0v.1A1.6 1.6 0 0 0 15 2.6a1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V7a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
+        设置</a>
+    </nav>
+    <div class="spacer"></div>
+    <div class="foot">v1.3 · 本地数据库<br>扫描引擎就绪</div>
+  </aside>
+
+  <!-- 主区 -->
+  <div class="main">
+    <!-- 概览页 -->
+    <section data-panel="overview">
+      <div class="topbar">
+        <div>
+          <div class="crumb">Photo World / 概览</div>
+          <h1 class="page-title">概览</h1>
+          <div class="page-sub">本地照片与视频的统一管理与检索</div>
+        </div>
+        <div class="actions">
+          <button class="btn ghost">+ 添加文件夹</button>
+          <button class="btn">重新扫描全部</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="stats">
+          <div class="stat accent"><div class="label">图片</div><div class="value">12,480</div><div class="hint">含实况照片帧</div></div>
+          <div class="stat"><div class="label">视频</div><div class="value">1,236</div><div class="hint">含实况动态</div></div>
+          <div class="stat"><div class="label">实况照片</div><div class="value">842</div><div class="hint">HEIC + MOV 配对</div></div>
+          <div class="stat"><div class="label">总占用空间</div><div class="value">186<small>GB</small></div><div class="hint">所有受管文件</div></div>
+          <div class="stat"><div class="label">丢失文件</div><div class="value">7</div><div class="hint">扫描后缺失</div></div>
+          <div class="stat"><div class="label">重复浪费</div><div class="value">2.4<small>GB</small></div><div class="hint">可清理空间</div></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>受管理文件夹</h2><a class="link" href="#">查看全部 →</a></div>
+          <div class="card">
+            <table>
+              <thead><tr><th>路径</th><th>图片</th><th>视频</th><th>实况</th><th>扫描状态</th><th>最后扫描</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="mono">D:\Photos\iPhone\2025</td><td class="num">5,210</td><td class="num">402</td><td class="num">388</td><td><span class="badge done">已完成</span></td><td>2026-08-26 21:10</td><td><button class="icon-btn">重新扫描</button></td></tr>
+                <tr><td class="mono">D:\Photos\Camera\RAW</td><td class="num">3,118</td><td class="num">0</td><td class="num">0</td><td><span class="badge scanning">扫描中</span></td><td>2026-08-26 21:30</td><td><button class="icon-btn">查看</button></td></tr>
+                <tr><td class="mono">E:\Backup\Travel</td><td class="num">4,152</td><td class="num">834</td><td class="num">454</td><td><span class="badge done">已完成</span></td><td>2026-08-25 09:02</td><td><button class="icon-btn">重新扫描</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head"><h2>最近扫描任务</h2><a class="link" href="#">查看全部 →</a></div>
+          <div class="card">
+            <table>
+              <thead><tr><th>文件夹</th><th>状态</th><th>进度</th><th>新增 / 更新 / 失败</th><th>开始时间</th></tr></thead>
+              <tbody>
+                <tr><td class="mono">D:\Photos\Camera\RAW</td><td><span class="badge scanning">进行中</span></td><td class="num">1,204 / 3,118</td><td class="num">1,204 / 0 / 0</td><td>2026-08-26 21:30</td></tr>
+                <tr><td class="mono">D:\Photos\iPhone\2025</td><td><span class="badge done">已完成</span></td><td class="num">5,612 / 5,612</td><td class="num">5,210 / 402 / 0</td><td>2026-08-26 21:10</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 媒体列表页 -->
+    <section data-panel="media" class="hidden">
+      <div class="topbar">
+        <div>
+          <div class="crumb">Photo World / 媒体</div>
+          <h1 class="page-title">媒体列表</h1>
+          <div class="page-sub">按元数据筛选、排序与检索全部照片和视频</div>
+        </div>
+        <div class="actions">
+          <button class="btn ghost">导出 CSV</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="filter-card">
+          <div class="filter-head">
+            <div class="title">🔍 筛选与搜索</div>
+            <div class="tools">
+              <button class="icon-btn">重置</button>
+              <button class="btn">应用筛选</button>
+            </div>
+          </div>
+          <div class="filter-body">
+            <div class="fgroup">
+              <div class="glabel">关键字</div>
+              <div class="frow">
+                <div class="field search"><span>搜索</span><input placeholder="文件名 / 路径，或 md5:xxx 精确搜"></div>
+                <div class="field"><span>类型</span>
+                  <select><option>全部</option><option>图片</option><option>视频</option></select></div>
+              </div>
+            </div>
+
+            <div class="fgroup">
+              <div class="glabel">来源与格式</div>
+              <div class="frow">
+                <div class="field"><span>文件夹</span><select><option>全部文件夹</option><option>D:\Photos\iPhone\2025</option></select></div>
+                <div class="field"><span>格式</span><select><option>全部格式</option><option>HEIC</option><option>JPG</option><option>MOV</option><option>MP4</option></select></div>
+                <div class="field"><span>相机厂商</span><select><option>全部</option><option>Apple</option><option>Canon</option></select></div>
+                <div class="field"><span>相机型号</span><select><option>全部</option><option>iPhone 15 Pro</option></select></div>
+              </div>
+            </div>
+
+            <div class="fgroup">
+              <div class="glabel">拍摄时间</div>
+              <div class="frow">
+                <div class="field"><span>从</span><input type="date"></div>
+                <div class="field"><span>至</span><input type="date"></div>
+                <label class="check"><input type="checkbox"> 仅无拍摄时间</label>
+              </div>
+            </div>
+
+            <div class="fgroup">
+              <div class="glabel">属性</div>
+              <div class="frow">
+                <div class="field"><span>分辨率</span><select><option>全部</option><option>&lt;100万</option><option>100-500万</option><option>500-1000万</option><option>&gt;1000万</option></select></div>
+                <div class="field"><span>大小 ≥ MB</span><input type="number" placeholder="不限"></div>
+                <div class="field"><span>大小 ≤ MB</span><input type="number" placeholder="不限"></div>
+                <div class="field"><span>时长 ≥ 秒</span><input type="number" placeholder="不限"></div>
+                <div class="field"><span>时长 ≤ 秒</span><input type="number" placeholder="不限"></div>
+                <div class="field"><span>ISO ≥</span><input type="number" placeholder="不限"></div>
+                <div class="field"><span>焦距 ≥ mm</span><input type="number" placeholder="不限"></div>
+                <div class="field"><span>位置</span><select><option>不限</option><option>有位置</option><option>无位置</option></select></div>
+                <div class="field"><span>状态</span><select><option>全部</option><option>正常</option><option>降级</option><option>丢失</option></select></div>
+              </div>
+              <div class="checkrow">
+                <label class="check"><input type="checkbox"> 仅实况照片</label>
+                <label class="check"><input type="checkbox"> 仅重复文件</label>
+              </div>
+            </div>
+          </div>
+          <div class="filter-foot">
+            <span class="meta">共 <b>13,716</b> 条结果 · 已应用 3 个筛选条件</span>
+            <span class="meta">点击列标题可排序</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <table>
+            <thead><tr>
+              <th>文件名</th><th>类型</th><th>目录</th><th>拍摄时间</th><th>格式</th>
+              <th>分辨率</th><th>时长</th><th>大小</th><th>状态</th><th>重复</th><th></th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td class="mono">IMG_4821.HEIC <span class="tag-live">实况</span></td>
+                <td>图片</td><td class="mono">iPhone\2025</td><td class="num">2026-08-20 14:32</td>
+                <td>HEIC</td><td class="num">4032×3024</td><td>—</td><td class="num">2.8 MB</td>
+                <td><span class="badge ok">正常</span></td><td>—</td>
+                <td><button class="icon-btn">复制路径</button></td>
+              </tr>
+              <tr>
+                <td class="mono">IMG_4821.MOV</td>
+                <td>视频</td><td class="mono">iPhone\2025</td><td class="num">2026-08-20 14:32</td>
+                <td>MOV</td><td class="num">1920×1080</td><td class="num">0:03</td><td class="num">4.1 MB</td>
+                <td><span class="badge ok">正常</span></td><td>—</td>
+                <td><button class="icon-btn">复制路径</button></td>
+              </tr>
+              <tr>
+                <td class="mono">DSC_0098.JPG</td>
+                <td>图片</td><td class="mono">Camera\RAW</td><td class="num">2026-07-12 09:14</td>
+                <td>JPG</td><td class="num">6000×4000</td><td>—</td><td class="num">11.2 MB</td>
+                <td><span class="badge ok">正常</span></td><td><span class="tag-live">×2</span></td>
+                <td><button class="icon-btn">复制路径</button></td>
+              </tr>
+              <tr>
+                <td class="mono">clip_2024.mp4</td>
+                <td>视频</td><td class="mono">Travel</td><td class="num">—</td>
+                <td>MP4</td><td class="num">3840×2160</td><td class="num">02:14</td><td class="num">486 MB</td>
+                <td><span class="badge degraded">降级</span></td><td>—</td>
+                <td><button class="icon-btn">复制路径</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="pager">
+            <div class="left">第 1 / 275 页 · 每页
+              <select style="background:var(--bg);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;padding:5px 8px"><option>20</option><option selected>50</option><option>100</option><option>200</option></select>
+              条</div>
+            <div class="right">
+              <button class="icon-btn">← 上一页</button>
+              <span class="meta">1</span>
+              <button class="icon-btn">下一页 →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.nav a').forEach(a=>{
+    a.addEventListener('click',e=>{
+      e.preventDefault();
+      document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('active'));
+      a.classList.add('active');
+      const v=a.dataset.view;
+      document.querySelectorAll('[data-panel]').forEach(p=>p.classList.add('hidden'));
+      document.querySelector('[data-panel="'+v+'"]').classList.remove('hidden');
+    });
+  });
+</script>
+</body>
+</html>

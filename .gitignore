@@ -1,0 +1,26 @@
+# ===== Dependencies =====
+node_modules/
+
+# ===== Database (better-sqlite3 WAL files, contains user's local scan data) =====
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# ===== Local config (contains user-specific ffmpeg/ffprobe paths) =====
+config/
+
+# ===== Logs =====
+logs/
+
+# ===== WorkBuddy project data (agent state, not source) =====
+.workbuddy/
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+*.log
+
+# ===== Env =====
+.env
+.env.local

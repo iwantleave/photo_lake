@@ -1,0 +1,85 @@
+<%- include('partials/nav', {active:'home', title:'概览'}) %>
+<div class="topbar">
+  <div>
+    <div class="crumb">Photo World / 概览</div>
+    <h1 class="page-title">概览</h1>
+    <div class="page-sub">本地照片与视频的统一管理与检索</div>
+  </div>
+  <div class="actions">
+    <a href="/folders" class="btn">+ 添加文件夹</a>
+    <button class="btn ghost" id="rescan-all">重新扫描全部</button>
+  </div>
+</div>
+<div class="content">
+  <div class="stats">
+    <div class="stat accent"><div class="label">图片</div><div class="value"><%= stats.images||0 %></div><div class="hint">含实况照片帧</div></div>
+    <div class="stat"><div class="label">视频</div><div class="value"><%= stats.videos||0 %></div><div class="hint">含实况动态</div></div>
+    <div class="stat"><div class="label">实况照片</div><div class="value"><%= stats.live||0 %></div><div class="hint">HEIC + MOV 配对</div></div>
+    <div class="stat"><div class="label">总占用空间</div><div class="value"><%= stats.sizeHR %></div><div class="hint">所有受管文件</div></div>
+    <div class="stat"><div class="label">丢失文件</div><div class="value"><%= stats.missing||0 %></div><div class="hint">扫描后缺失</div></div>
+    <div class="stat"><div class="label">重复浪费</div><div class="value"><%= stats.dupWasteHR %></div><div class="hint">可清理空间</div></div>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>受管理文件夹</h2><a class="link" href="/folders">查看全部 →</a></div>
+    <% if (folders.length === 0) { %>
+      <div class="card pad"><p class="muted">尚未添加任何文件夹。<a href="/folders">去添加 →</a></p></div>
+    <% } else { %>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>路径</th><th>图片</th><th>视频</th><th>实况</th><th>扫描状态</th><th>最后扫描</th></tr></thead>
+          <tbody>
+          <% folders.forEach(function(f){ %>
+            <tr>
+              <td class="mono"><%= f.path %></td>
+              <td class="num"><%= f.image_count %></td>
+              <td class="num"><%= f.video_count %></td>
+              <td class="num"><%= f.livephoto_count %></td>
+              <td><span class="badge <%= f.scan_status %>"><%= f.scan_status %></span></td>
+              <td><%= f.last_scan_at ? f.last_scan_at.slice(0,19).replace('T',' ') : '-' %></td>
+            </tr>
+          <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="section">
+    <div class="section-head"><h2>最近扫描任务</h2><a class="link" href="/jobs">查看全部 →</a></div>
+    <% if (recentJobs.length === 0) { %>
+      <div class="card pad"><p class="muted">暂无任务</p></div>
+    <% } else { %>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>文件夹</th><th>状态</th><th>进度</th><th>新增 / 更新 / 失败</th><th>时间</th></tr></thead>
+          <tbody>
+          <% recentJobs.forEach(function(j){ %>
+            <tr>
+              <td>文件夹 #<%= j.folder_id %></td>
+              <td><span class="badge <%= j.status %>"><%= j.status %></span></td>
+              <td class="num"><%= j.processed %> / <%= j.total_count %></td>
+              <td class="num"><%= j.added %> / <%= j.updated %> / <%= j.failed %></td>
+              <td><%= j.started_at ? j.started_at.slice(0,19).replace('T',' ') : '-' %></td>
+            </tr>
+          <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+<%- include('partials/foot') %>
+<script>
+  function toast(m){ let t=document.getElementById('__toast'); if(!t){t=document.createElement('div');t.id='__toast';t.className='toast';document.body.appendChild(t);} t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+  document.getElementById('rescan-all').addEventListener('click', async ()=>{
+    try{
+      const list = await (await fetch('/api/folders')).json();
+      let n=0;
+      for(const f of list){ await fetch('/api/folders/'+f.id+'/rescan',{method:'POST'}); n++; }
+      toast('已触发 '+n+' 个文件夹的重新扫描');
+    }catch(e){ toast('触发失败'); }
+  });
+</script>
+</body>
+</html>

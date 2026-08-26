@@ -1,0 +1,118 @@
+<%- include('partials/nav', {active:'media', title:'媒体列表'}) %>
+<div class="topbar">
+  <div>
+    <div class="crumb">Photo World / 媒体</div>
+    <h1 class="page-title">媒体列表</h1>
+    <div class="page-sub">按元数据筛选、排序与检索全部照片和视频</div>
+  </div>
+  <div class="actions">
+    <button class="btn ghost" id="export-csv">导出 CSV</button>
+  </div>
+</div>
+<div class="content">
+  <div class="filter-card">
+    <div class="filter-head">
+      <div class="title">🔍 筛选与搜索</div>
+      <div class="tools">
+        <button class="icon-btn" id="btn-reset">重置</button>
+        <button class="btn" id="btn-query">应用筛选</button>
+      </div>
+    </div>
+    <div class="filter-body">
+      <div class="fgroup">
+        <div class="glabel">关键字</div>
+        <div class="frow">
+          <div class="field search"><span>搜索</span><input type="text" id="f-q" placeholder="文件名 / 路径，或 md5:xxx 精确搜"></div>
+          <div class="field"><span>类型</span>
+            <select id="f-type"><option value="">全部</option><option value="image">图片</option><option value="video">视频</option></select></div>
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <div class="glabel">来源与格式</div>
+        <div class="frow">
+          <div class="field"><span>文件夹（可多选）</span><select id="f-folder" multiple size="1"></select></div>
+          <div class="field"><span>格式（可多选）</span><select id="f-format" multiple size="1"></select></div>
+          <div class="field"><span>相机厂商</span><select id="f-make"></select></div>
+          <div class="field"><span>相机型号</span><select id="f-model"></select></div>
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <div class="glabel">拍摄时间</div>
+        <div class="frow">
+          <div class="field"><span>从</span><input type="date" id="f-tfrom"></div>
+          <div class="field"><span>至</span><input type="date" id="f-tto"></div>
+          <label class="check"><input type="checkbox" id="f-notime"> 仅无拍摄时间</label>
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <div class="glabel">属性</div>
+        <div class="frow">
+          <div class="field"><span>分辨率</span>
+            <select id="f-mp">
+              <option value="">全部</option>
+              <option value="0,1">&lt;100万</option>
+              <option value="1,5">100-500万</option>
+              <option value="5,10">500-1000万</option>
+              <option value="10,9999">&gt;1000万</option>
+            </select></div>
+          <div class="field"><span>大小 ≥ MB</span><input type="number" id="f-smin" placeholder="不限"></div>
+          <div class="field"><span>大小 ≤ MB</span><input type="number" id="f-smax" placeholder="不限"></div>
+          <div class="field"><span>时长 ≥ 秒</span><input type="number" id="f-dmin" placeholder="不限"></div>
+          <div class="field"><span>时长 ≤ 秒</span><input type="number" id="f-dmax" placeholder="不限"></div>
+          <div class="field"><span>ISO ≥</span><input type="number" id="f-iso" placeholder="不限"></div>
+          <div class="field"><span>焦距 ≥ mm</span><input type="number" id="f-focal" placeholder="不限"></div>
+          <div class="field"><span>位置</span>
+            <select id="f-gps"><option value="">不限</option><option value="1">有位置</option><option value="0">无位置</option></select></div>
+          <div class="field"><span>状态（可多选）</span>
+            <select id="f-status" multiple size="1">
+              <option value="ok">正常</option><option value="failed">失败</option><option value="degraded">降级</option><option value="missing">丢失</option>
+            </select></div>
+        </div>
+        <div class="checkrow">
+          <label class="check"><input type="checkbox" id="f-live"> 仅实况照片</label>
+          <label class="check"><input type="checkbox" id="f-dup"> 仅重复文件</label>
+        </div>
+      </div>
+    </div>
+    <div class="filter-foot">
+      <span id="table-meta" class="meta"></span>
+      <span class="meta">点击列标题可排序</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="tbl">
+      <thead><tr>
+        <th data-sort="file_name">文件名</th>
+        <th data-sort="media_type">类型</th>
+        <th>目录</th>
+        <th data-sort="taken_at">拍摄时间</th>
+        <th data-sort="format">格式</th>
+        <th data-sort="megapixel">分辨率</th>
+        <th data-sort="duration">时长</th>
+        <th data-sort="file_size">大小</th>
+        <th data-sort="scan_status">状态</th>
+        <th>重复</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="media-body"></tbody>
+    </table>
+    <div class="pager">
+      <div class="left"><span id="pageinfo" class="meta"></span></div>
+      <div class="right">
+        <select id="pagesize" class="ps-select">
+          <option>20</option><option selected>50</option><option>100</option><option>200</option>
+        </select>
+        <button class="icon-btn" id="prev">← 上一页</button>
+        <button class="icon-btn" id="next">下一页 →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('partials/foot') %>
+<script src="/app.js"></script>
+</body>
+</html>

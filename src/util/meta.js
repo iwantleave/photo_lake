@@ -132,7 +132,7 @@ async function parseImage(filePath, ffprobeResolved) {
     gps = {};
   }
 
-  // 分辨率：非 HEIC 优先 sharp；HEIC sharp 不支持，回退 ffprobe
+  // 分辨率：非 HEIC 优先 sharp；HEIC sharp 不支持解码，改从 EXIF 读取真实像素尺寸
   let width = null;
   let height = null;
   let sharpError = null;
@@ -145,8 +145,19 @@ async function parseImage(filePath, ffprobeResolved) {
       sharpError = e.message;
     }
   }
+  // EXIF 中的原始像素尺寸（ExifImageWidth/Height 或 PixelXDimension/YDimension）；
+  // 对 HEIC 这是唯一可靠的真实分辨率来源（ffprobe 对 HEIC 只会吐出缩略图/分块流）
+  if (width == null || height == null) {
+    const ew = exif.ExifImageWidth || exif.PixelXDimension || exif.ImageWidth;
+    const eh = exif.ExifImageHeight || exif.PixelYDimension || exif.ImageHeight;
+    if (ew && eh) {
+      width = parseInt(ew, 10) || null;
+      height = parseInt(eh, 10) || null;
+    }
+  }
+  // 非 HEIC 在 sharp/exif 都失败时才用 ffprobe 兜底；HEIC 的 ffprobe 分辨率不可用，跳过
   let ffprobeMerged = null;
-  if ((width == null || height == null) && ffprobeResolved && ffprobeResolved.ok) {
+  if ((width == null || height == null) && !isHeic && ffprobeResolved && ffprobeResolved.ok) {
     try {
       const fj = await ffprobeJson(filePath, ffprobeResolved.path);
       const p = parseFfprobeJson(fj);

@@ -125,4 +125,8 @@ This project targets US-based clients and complies with US law. The map uses Ope
 
 ## License
 
-For study and research purposes. See the repository LICENSE file (if any).
+This project is licensed under the [MIT License](./LICENSE).
+
+- Anyone may use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, provided the copyright notice and permission notice are included.
+- The software is provided "as is", without warranty of any kind.
+- Copyright: iwantleave (2026).

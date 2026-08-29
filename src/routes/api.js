@@ -207,6 +207,16 @@ async function listMedia(req, reply) {
   return { rows, total, page, pageSize, sort, order };
 }
 
+// 单条媒体详情（含 raw_metadata 全文，仅详情页使用）
+async function getMediaDetail(req, reply) {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return reply.code(400).send({ error: 'invalid id' });
+  const media = db.prepare('SELECT * FROM media WHERE id=?').get(id);
+  if (!media) return reply.code(404).send({ error: 'not found' });
+  const folder = db.prepare('SELECT id, path, alias FROM folders WHERE id=?').get(media.folder_id);
+  return { media, folder: folder || null };
+}
+
 // 下拉选项（相机厂商/型号/格式）用于筛选
 async function mediaFacets(req, reply) {
   const makes = db.prepare('SELECT DISTINCT camera_make FROM media WHERE camera_make IS NOT NULL ORDER BY camera_make').all().map(r => r.camera_make);
@@ -274,6 +284,9 @@ async function registerApi(fastify) {
   fastify.post('/api/media/:id/mark', markMedia);
 
   fastify.get('/api/media/duplicates', listDuplicates);
+
+  // 注意：必须放在 /api/media/facets、/api/media/duplicates 之后，确保静态路由优先命中
+  fastify.get('/api/media/:id', getMediaDetail);
 
   fastify.get('/api/jobs', listJobs);
   fastify.get('/api/jobs/:id', getJob);

@@ -38,6 +38,198 @@
     navigator.clipboard.writeText(p).then(() => toast('已复制路径'));
   }
 
+  // ---------------- 详情弹窗（媒体页 / 重复页共用）----------------
+  let __detailMask = null;
+
+  function dvRaw(v) {
+    if (v === null || v === undefined || v === '') return '<span class="dv-empty">—</span>';
+    return esc(v);
+  }
+  function dvRow(k, v) {
+    return '<div class="dv-row"><div class="dv-k">' + esc(k) + '</div><div class="dv-v">' + v + '</div></div>';
+  }
+  function dvGroup(title, rows) {
+    const has = rows.some((r) => r.indexOf('dv-empty') === -1);
+    return (
+      '<div class="dv-group' + (has ? '' : ' dv-group-empty') + '">' +
+      '<div class="dv-gtitle">' + esc(title) + '</div>' +
+      rows.join('') +
+      '</div>'
+    );
+  }
+  function dvBool(v) {
+    return v ? '<span class="badge ok">是</span>' : '<span class="badge">否</span>';
+  }
+  function dvTime(t) {
+    return t ? '<span class="mono">' + esc(String(t).slice(0, 19).replace('T', ' ')) + '</span>' : '<span class="dv-empty">—</span>';
+  }
+
+  function detailHtml(m, folder) {
+    const isVideo = m.media_type === 'video';
+    const res = m.width && m.height ? m.width + ' × ' + m.height : null;
+    const g = [];
+
+    g.push(
+      dvGroup('基础信息', [
+        dvRow('文件名', '<span class="mono wrap">' + esc(m.file_name) + '</span>'),
+        dvRow('媒体类型', isVideo ? '🎬 视频' : '🖼 图片'),
+        dvRow('格式', '<span class="dv-tag">' + esc(m.format) + '</span>'),
+        dvRow('来源文件夹', folder ? esc(folder.alias || folder.path) : '<span class="dv-empty">—</span>'),
+        dvRow('所在目录', '<span class="mono wrap">' + esc(m.dir_path) + '</span>'),
+        dvRow('完整路径', '<span class="mono wrap">' + esc(m.file_path) + '</span>'),
+        dvRow('文件大小', fmtSize(m.file_size)),
+        dvRow('文件修改时间', dvTime(m.mtime))
+      ])
+    );
+
+    g.push(
+      dvGroup('拍摄时间', [
+        dvRow('拍摄时间', dvTime(m.taken_at)),
+        dvRow(
+          '时间来源',
+          m.taken_at_source === 'exif'
+            ? '<span class="badge ok">EXIF</span>'
+            : m.taken_at_source === 'ffprobe'
+            ? '<span class="badge scanning">ffprobe</span>'
+            : '<span class="badge degraded">文件修改时间</span>'
+        )
+      ])
+    );
+
+    const mediaRows = [dvRow('分辨率', res ? '<span class="mono">' + esc(res) + '</span>' : '<span class="dv-empty">—</span>')];
+    if (m.megapixel != null) mediaRows.push(dvRow('像素', m.megapixel.toFixed(2) + ' MP'));
+    if (isVideo) {
+      mediaRows.push(dvRow('时长', m.duration != null ? fmtDur(m.duration) : '<span class="dv-empty">—</span>'));
+      mediaRows.push(dvRow('视频编码', m.codec ? '<span class="dv-tag">' + esc(m.codec) + '</span>' : '<span class="dv-empty">—</span>'));
+    }
+    g.push(dvGroup(isVideo ? '视频参数' : '图像参数', mediaRows));
+
+    g.push(
+      dvGroup('拍摄参数（EXIF）', [
+        dvRow('相机厂商', dvRaw(m.camera_make)),
+        dvRow('相机型号', dvRaw(m.camera_model)),
+        dvRow('镜头型号', dvRaw(m.lens_model)),
+        dvRow('光圈', m.f_number != null ? 'f/' + m.f_number : '<span class="dv-empty">—</span>'),
+        dvRow('快门速度', m.exposure_time ? esc(m.exposure_time) + ' s' : '<span class="dv-empty">—</span>'),
+        dvRow('ISO', m.iso != null ? '<span class="mono">' + m.iso + '</span>' : '<span class="dv-empty">—</span>'),
+        dvRow('焦距', m.focal_length != null ? m.focal_length + ' mm' : '<span class="dv-empty">—</span>'),
+        dvRow('方向', m.orientation != null ? m.orientation : '<span class="dv-empty">—</span>')
+      ])
+    );
+
+    const hasGps = m.gps_lat != null && m.gps_lon != null;
+    g.push(
+      dvGroup(
+        '位置信息',
+        [
+          dvRow('纬度', m.gps_lat != null ? '<span class="mono">' + m.gps_lat + '</span>' : '<span class="dv-empty">—</span>'),
+          dvRow('经度', m.gps_lon != null ? '<span class="mono">' + m.gps_lon + '</span>' : '<span class="dv-empty">—</span>'),
+          dvRow('海拔', m.gps_alt != null ? m.gps_alt + ' m' : '<span class="dv-empty">—</span>')
+        ].concat(
+          hasGps
+            ? [dvRow('地图', '<a class="dv-link" href="https://uri.amap.com/marker?position=' + m.gps_lon + ',' + m.gps_lat + '" target="_blank" rel="noopener">在高德地图查看</a>')]
+            : []
+        )
+      )
+    );
+
+    const statusRows = [
+      dvRow(
+        '扫描状态',
+        m.is_missing
+          ? '<span class="badge missing">文件丢失</span>'
+          : '<span class="badge ' + esc(m.scan_status) + '">' + esc(m.scan_status) + '</span>'
+      ),
+      dvRow('MD5', m.md5 ? '<span class="mono wrap">' + esc(m.md5) + '</span>' : '<span class="dv-empty">无（视频 MD5 已关闭）</span>')
+    ];
+    if (m.fail_reason) statusRows.push(dvRow('失败原因', esc(m.fail_reason)));
+    statusRows.push(dvRow('文件丢失', dvBool(m.is_missing)));
+    if (m.is_missing) statusRows.push(dvRow('丢失发现于', dvTime(m.missing_since)));
+    statusRows.push(dvRow('实况照片', m.is_livephoto ? '<span class="badge live">实况</span>' : '<span class="badge">否</span>'));
+    statusRows.push(dvRow('用户标记', dvBool(m.marked)));
+    g.push(dvGroup('校验与状态', statusRows));
+
+    g.push(
+      dvGroup('系统字段', [
+        dvRow('记录 ID', '<span class="mono">#' + m.id + '</span>'),
+        dvRow('入库时间', dvTime(m.gmt_create)),
+        dvRow('更新时间', dvTime(m.gmt_modified))
+      ])
+    );
+
+    let raw = '';
+    if (m.raw_metadata) {
+      let pretty = m.raw_metadata;
+      try {
+        pretty = JSON.stringify(JSON.parse(m.raw_metadata), null, 2);
+      } catch (e) {
+        /* 非合法 JSON 时按原文展示 */
+      }
+      raw =
+        '<div class="dv-group"><div class="dv-gtitle">原始元数据（raw_metadata）</div>' +
+        '<details class="dv-raw"><summary>展开 JSON（' + m.raw_metadata.length + ' 字符）</summary>' +
+        '<pre class="dv-pre">' + esc(pretty) + '</pre></details></div>';
+    }
+
+    return (
+      '<div class="modal-head">' +
+      '<div class="modal-title">' +
+      (isVideo ? '🎬 ' : '🖼 ') + esc(m.file_name) +
+      '<span class="modal-id">#' + m.id + '</span>' +
+      '</div>' +
+      '<button class="modal-close" type="button" aria-label="关闭">✕</button>' +
+      '</div>' +
+      '<div class="modal-body">' + g.join('') + raw + '</div>' +
+      '<div class="modal-foot">' +
+      '<button class="btn-sm" data-copy="' + esc(m.file_path) + '">复制完整路径</button>' +
+      '<button class="btn-sm" data-copy="' + esc(m.dir_path) + '">复制所在目录</button>' +
+      '<span class="spacer"></span>' +
+      '<button class="btn ghost modal-close">关闭</button>' +
+      '</div>'
+    );
+  }
+
+  function ensureDetailMask() {
+    if (__detailMask) return __detailMask;
+    __detailMask = document.createElement('div');
+    __detailMask.className = 'modal-mask';
+    __detailMask.id = 'detail-mask';
+    document.body.appendChild(__detailMask);
+
+    __detailMask.addEventListener('click', (e) => {
+      if (e.target === __detailMask) return closeDetail();
+      if (e.target.closest('.modal-close')) return closeDetail();
+      const c = e.target.closest('[data-copy]');
+      if (c) copyPath(c.dataset.copy);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && __detailMask.classList.contains('show')) closeDetail();
+    });
+    return __detailMask;
+  }
+
+  function closeDetail() {
+    if (__detailMask) __detailMask.classList.remove('show');
+  }
+
+  function openDetail(id) {
+    const mask = ensureDetailMask();
+    mask.innerHTML = '<div class="modal"><div class="modal-loading">加载中…</div></div>';
+    mask.classList.add('show');
+    api('/api/media/' + id)
+      .then((d) => {
+        if (!d || d.error) {
+          mask.innerHTML = '<div class="modal"><div class="modal-loading">加载失败：' + esc((d && d.error) || '未知错误') + '</div></div>';
+          return;
+        }
+        mask.innerHTML = '<div class="modal">' + detailHtml(d.media, d.folder) + '</div>';
+      })
+      .catch(() => {
+        mask.innerHTML = '<div class="modal"><div class="modal-loading">加载失败，请检查服务是否运行</div></div>';
+      });
+  }
+  window.openDetail = openDetail;
+
   // ---------------- 媒体页 ----------------
   if (document.getElementById('media-body')) initMedia();
   function initMedia() {
@@ -155,12 +347,20 @@
         '<td>' + fmtSize(r.file_size) + '</td>' +
         '<td>' + status + '</td>' +
         '<td></td>' +
-        '<td class="ops"><button class="btn-sm copy-btn" data-path="' + esc(r.file_path) + '">复制路径</button></td>' +
+        '<td class="ops">' +
+          '<button class="btn-sm detail-btn" data-id="' + r.id + '">详情</button>' +
+          '<button class="btn-sm copy-btn" data-path="' + esc(r.file_path) + '">复制路径</button>' +
+        '</td>' +
         '</tr>'
       );
     }
 
     body.addEventListener('click', (e) => {
+      const d = e.target.closest('.detail-btn');
+      if (d) {
+        openDetail(d.dataset.id);
+        return;
+      }
       const b = e.target.closest('.copy-btn');
       if (b) copyPath(b.dataset.path);
     });
@@ -213,6 +413,10 @@
   if (document.getElementById('dup-body')) initDup();
   function initDup() {
     const body = document.getElementById('dup-body');
+    body.addEventListener('click', (e) => {
+      const b = e.target.closest('.detail-btn');
+      if (b) openDetail(b.dataset.id);
+    });
     api('/api/media/duplicates').then((d) => {
       if (!d.groups.length) {
         body.innerHTML = '<p class="muted">没有发现重复文件。</p>';
@@ -241,6 +445,7 @@
                 fmtSize(m.file_size) +
                 ')</span>' +
                 (m.is_missing ? '<span class="badge missing">missing</span>' : '') +
+                ' <button class="btn-sm detail-btn" data-id="' + m.id + '">详情</button>' +
                 '</li>'
             )
             .join('') +

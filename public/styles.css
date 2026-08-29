@@ -122,6 +122,9 @@ a{color:var(--accent);text-decoration:none}
   border-radius:9px;padding:9px 11px;font-size:13px;min-width:150px;transition:.15s;
 }
 .field input:focus,.field select:focus,.ps-select:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field select option,.field select optgroup{background:var(--panel-2);color:var(--text)}
+.field select option:checked{background:var(--accent);color:#fff}
+.field select{color-scheme:dark}
 .field.search input{min-width:320px}
 .field.wide input{min-width:340px}
 .field textarea{min-width:420px;min-height:70px;background:var(--bg);color:var(--text);border:1px solid var(--border-strong);border-radius:9px;padding:9px 11px;font-size:13px;font-family:inherit}

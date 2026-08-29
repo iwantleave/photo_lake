@@ -41,6 +41,17 @@ fastify.register(fastifyStatic, {
   prefix: '/vendor/alpine/',
   decorateReply: false
 });
+// 本地 vendor：Leaflet / markercluster（从 node_modules 提供，离线可用）
+fastify.register(fastifyStatic, {
+  root: path.join(__dirname, '..', 'node_modules', 'leaflet', 'dist'),
+  prefix: '/vendor/leaflet/',
+  decorateReply: false
+});
+fastify.register(fastifyStatic, {
+  root: path.join(__dirname, '..', 'node_modules', 'leaflet.markercluster', 'dist'),
+  prefix: '/vendor/leaflet-markercluster/',
+  decorateReply: false
+});
 
 fastify.register(api.registerApi);
 fastify.register(pages.registerPages);

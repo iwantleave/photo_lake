@@ -1,0 +1,110 @@
+<%- include('partials/nav', {active:'map', title:'地图打点'}) %>
+<div class="topbar">
+  <div>
+    <div class="crumb">Photo World / 地图</div>
+    <h1 class="page-title">拍摄足迹</h1>
+    <div class="page-sub">按 GPS 坐标在地图上打点，点击标记查看媒体详情</div>
+  </div>
+  <div class="actions">
+    <span class="muted" id="pt-count">…</span>
+  </div>
+</div>
+
+<div class="content map-content">
+  <div class="map-toolbar">
+    <label class="tb-field">文件夹
+      <select id="m-folder" multiple size="1" class="tb-select">
+        <% folders.forEach(function(f){ %>
+        <option value="<%= f.id %>"><%= (f.alias || f.path) %></option>
+        <% }); %>
+      </select>
+    </label>
+    <label class="tb-field">类型
+      <select id="m-type" class="tb-select">
+        <option value="">全部</option>
+        <option value="image">图片</option>
+        <option value="video">视频</option>
+      </select>
+    </label>
+    <label class="tb-check"><input type="checkbox" id="m-missing"> 包含已丢失</label>
+    <button class="btn-sm" id="m-query">应用</button>
+    <button class="btn-sm ghost" id="m-fit">重置视图</button>
+  </div>
+  <div id="map"></div>
+</div>
+
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/vendor/leaflet-markercluster/MarkerCluster.css">
+<link rel="stylesheet" href="/vendor/leaflet-markercluster/MarkerCluster.Default.css">
+<script src="/app.js"></script>
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script src="/vendor/leaflet-markercluster/leaflet.markercluster.js"></script>
+<script>
+(function () {
+  var map = L.map('map', { preferCanvas: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  var clusters = L.markerClusterGroup({
+    chunkedLoading: true,
+    showCoverageOnHover: false,
+    maxClusterRadius: 60,
+    iconCreateFunction: function (cluster) {
+      var n = cluster.getChildCount();
+      var sz = n < 10 ? 34 : n < 100 ? 42 : 52;
+      return L.divIcon({
+        html: '<div class="mc-badge" style="width:' + sz + 'px;height:' + sz + 'px;line-height:' + sz + 'px">' + n + '</div>',
+        className: 'mc-wrap',
+        iconSize: [sz, sz]
+      });
+    }
+  });
+  map.addLayer(clusters);
+
+  var bounds = [];
+  function colorOf(p) {
+    if (p.is_missing) return '#6b7280';
+    return p.media_type === 'video' ? '#b07cff' : '#4aa3ff';
+  }
+  function load() {
+    var p = new URLSearchParams();
+    var sel = document.getElementById('m-folder');
+    var fld = Array.from(sel.selectedOptions).map(function (o) { return o.value; }).filter(Boolean).join(',');
+    if (fld) p.set('folder_ids', fld);
+    var t = document.getElementById('m-type').value;
+    if (t) p.set('media_type', t);
+    if (document.getElementById('m-missing').checked) p.set('include_missing', '1');
+    fetch('/api/media/points?' + p.toString())
+      .then(function (r) { return r.json(); })
+      .then(function (d) { render(d.points); });
+  }
+  function render(points) {
+    clusters.clearLayers();
+    bounds = [];
+    points.forEach(function (pt) {
+      var icon = L.divIcon({
+        className: 'mc-wrap',
+        html: '<span class="map-dot" style="background:' + colorOf(pt) + '"></span>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+      var m = L.marker([pt.gps_lat, pt.gps_lon], { icon: icon });
+      var tt = pt.file_name + (pt.media_type === 'video' ? ' · 视频' : ' · 图片') +
+        (pt.is_livephoto ? ' · 实况' : '') + (pt.is_missing ? ' · 已丢失' : '');
+      m.bindTooltip(tt, { direction: 'top' });
+      m.on('click', function () { if (window.openDetail) window.openDetail(pt.id); });
+      clusters.addLayer(m);
+      bounds.push([pt.gps_lat, pt.gps_lon]);
+    });
+    document.getElementById('pt-count').textContent = points.length + ' 个点';
+    if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+  }
+  document.getElementById('m-query').addEventListener('click', load);
+  document.getElementById('m-fit').addEventListener('click', function () {
+    if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+  });
+  load();
+})();
+</script>

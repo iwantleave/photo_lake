@@ -162,6 +162,19 @@ a{color:var(--accent);text-decoration:none}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#000;color:#fff;padding:10px 16px;border-radius:8px;opacity:0;transition:.25s;pointer-events:none;z-index:99;font-size:13px}
 .toast.show{opacity:.95;transform:translateX(-50%) translateY(0)}
 
+/* ===== 地图页 ===== */
+.map-content{flex:1;display:flex;flex-direction:column;min-height:0;padding:0;max-width:none}
+.map-toolbar{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;padding:16px 44px;border-bottom:1px solid var(--border);background:var(--panel)}
+.tb-field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
+.tb-select{min-width:150px;background:var(--panel-2);color:var(--text);border:1px solid var(--border-strong);border-radius:8px;padding:7px 9px;font-size:13px}
+.tb-select[multiple]{max-height:34px;overflow:auto}
+.tb-check{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);padding-bottom:7px}
+#map{flex:1;min-height:0;width:100%;background:#0b0e13}
+.leaflet-container{background:#0b0e13;font:inherit}
+.map-dot{display:block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.9);box-shadow:0 0 6px rgba(0,0,0,.55)}
+.mc-wrap{background:transparent}
+.mc-badge{background:var(--accent);color:#fff;border-radius:50%;text-align:center;font-weight:700;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.45);border:2px solid rgba(255,255,255,.85)}
+
 /* ===== 详情弹窗 ===== */
 .modal-mask{
   position:fixed;inset:0;z-index:70;background:rgba(5,7,11,.68);backdrop-filter:blur(3px);

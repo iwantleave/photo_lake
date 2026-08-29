@@ -127,7 +127,7 @@
           dvRow('海拔', m.gps_alt != null ? m.gps_alt + ' m' : '<span class="dv-empty">—</span>')
         ].concat(
           hasGps
-            ? [dvRow('地图', '<a class="dv-link" href="https://uri.amap.com/marker?position=' + m.gps_lon + ',' + m.gps_lat + '" target="_blank" rel="noopener">在高德地图查看</a>')]
+            ? [dvRow('地图', '<a class="dv-link" href="https://www.openstreetmap.org/?mlat=' + m.gps_lat + '&mlon=' + m.gps_lon + '#map=15/' + m.gps_lat + '/' + m.gps_lon + '" target="_blank" rel="noopener">在 OpenStreetMap 查看</a>')]
             : []
         )
       )

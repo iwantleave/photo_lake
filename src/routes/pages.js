@@ -57,6 +57,11 @@ async function registerPages(fastify) {
     return reply.view('duplicates', {});
   });
 
+  fastify.get('/map', async (req, reply) => {
+    const folders = db.prepare('SELECT id, alias, path FROM folders ORDER BY added_at DESC').all();
+    return reply.view('map', { folders });
+  });
+
   fastify.get('/jobs', async (req, reply) => {
     return reply.view('jobs', {});
   });

@@ -217,6 +217,33 @@ async function getMediaDetail(req, reply) {
   return { media, folder: folder || null };
 }
 
+// 地图点位：返回有 GPS 的媒体（id/lat/lon/type/name/标记），供前端打点/聚合
+// 支持 folder_ids（csv）、media_type、include_missing 过滤；点数多时前端用 markercluster 聚合
+async function mediaPoints(req, reply) {
+  const { folder_ids, media_type, include_missing } = req.query;
+  const where = ['gps_lat IS NOT NULL', 'gps_lon IS NOT NULL'];
+  const params = [];
+  if (folder_ids) {
+    const ids = folder_ids.split(',').map((x) => parseInt(x, 10)).filter((x) => !isNaN(x));
+    if (ids.length) {
+      where.push('folder_id IN (' + ids.map(() => '?').join(',') + ')');
+      params.push(...ids);
+    }
+  }
+  if (media_type === 'image' || media_type === 'video') {
+    where.push('media_type=?');
+    params.push(media_type);
+  }
+  if (!include_missing) where.push('is_missing=0');
+  const rows = db
+    .prepare(
+      `SELECT id, gps_lat, gps_lon, media_type, file_name, format, is_livephoto, is_missing, taken_at, folder_id
+       FROM media WHERE ${where.join(' AND ')}`
+    )
+    .all(...params);
+  return { count: rows.length, points: rows };
+}
+
 // 下拉选项（相机厂商/型号/格式）用于筛选
 async function mediaFacets(req, reply) {
   const makes = db.prepare('SELECT DISTINCT camera_make FROM media WHERE camera_make IS NOT NULL ORDER BY camera_make').all().map(r => r.camera_make);
@@ -280,6 +307,7 @@ async function registerApi(fastify) {
   fastify.post('/api/settings/rescan-degraded', rescanDegraded);
 
   fastify.get('/api/media', listMedia);
+  fastify.get('/api/media/points', mediaPoints);
   fastify.get('/api/media/facets', mediaFacets);
   fastify.post('/api/media/:id/mark', markMedia);
 

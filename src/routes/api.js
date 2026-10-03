@@ -3,6 +3,8 @@ const path = require('path');
 const db = require('../db');
 const config = require('../config');
 const scanner = require('../scanner');
+const library = require('../library');
+const dirconv = require('../util/dirconv');
 
 function nowIso() {
   return new Date().toISOString();
@@ -35,12 +37,23 @@ async function addFolder(req, reply) {
     }
   }
 
+  // 按「年份 / YYYYMMDD+主题」约定解析元信息
+  const parsed = dirconv.parseFolderPath(full);
   const ts = nowIso();
   const id = db
     .prepare(
-      'INSERT INTO folders (path, alias, added_at, scan_status, gmt_create, gmt_modified) VALUES (?,?,?,?,?,?)'
+      `INSERT INTO folders (path, alias, year, topic, event_date, parent_path, added_at, scan_status, gmt_create, gmt_modified)
+       VALUES (?,?,?,?,?,?,?,'pending',?,?)`
     )
-    .run(full, alias || null, ts, 'pending', ts, ts).lastInsertRowid;
+    .run(
+      full,
+      alias || (parsed.year ? `${parsed.year} / ${parsed.dir_name}` : parsed.dir_name),
+      parsed.year,
+      parsed.topic,
+      parsed.event_date,
+      parsed.parent_path,
+      ts, ts, ts
+    ).lastInsertRowid;
 
   const jobId = scanner.startScan(id);
   return { id, jobId };
@@ -48,9 +61,49 @@ async function addFolder(req, reply) {
 
 async function listFolders(req, reply) {
   const rows = db
-    .prepare('SELECT * FROM folders ORDER BY added_at DESC')
+    .prepare('SELECT * FROM folders ORDER BY year DESC, event_date DESC, path')
     .all();
   return { folders: rows };
+}
+
+// ---------------- 按年份/主题约定的库导入 ----------------
+async function inspectLibrary(req, reply) {
+  const { path: p } = req.body || {};
+  try {
+    return library.inspect(p);
+  } catch (e) {
+    return reply.code(400).send({ error: e.message || String(e) });
+  }
+}
+
+async function listTopicsApi(req, reply) {
+  const { path: p } = req.body || {};
+  try {
+    const topics = library.listTopics(p);
+    return {
+      path: path.resolve(String(p)),
+      year: dirconv.isYearName(path.basename(path.resolve(String(p)))) ? path.basename(path.resolve(String(p))) : null,
+      topics
+    };
+  } catch (e) {
+    return reply.code(400).send({ error: e.message || String(e) });
+  }
+}
+
+async function importTopicsApi(req, reply) {
+  try {
+    return library.importTopics(req.body || {});
+  } catch (e) {
+    return reply.code(400).send({ error: e.message || String(e) });
+  }
+}
+
+async function rescanYearApi(req, reply) {
+  try {
+    return library.rescanYear((req.body || {}).year);
+  } catch (e) {
+    return reply.code(400).send({ error: e.message || String(e) });
+  }
 }
 
 async function removeFolder(req, reply) {
@@ -60,6 +113,7 @@ async function removeFolder(req, reply) {
   scanner.cancelByFolder(id);
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM media WHERE folder_id=?').run(id);
+    db.prepare('DELETE FROM scan_jobs WHERE folder_id=?').run(id); // 先清任务，避免外键约束
     db.prepare('DELETE FROM folders WHERE id=?').run(id);
   });
   tx();
@@ -274,7 +328,7 @@ async function listDuplicates(req, reply) {
 // ---------------- 任务 ----------------
 async function listJobs(req, reply) {
   const rows = db.prepare('SELECT * FROM scan_jobs ORDER BY started_at DESC LIMIT 50').all();
-  return { jobs: rows };
+  return { jobs: rows, queue: scanner.queueState() };
 }
 async function getJob(req, reply) {
   const id = +req.params.id;
@@ -299,6 +353,12 @@ async function registerApi(fastify) {
   fastify.post('/api/folders', addFolder);
   fastify.delete('/api/folders/:id', removeFolder);
   fastify.post('/api/folders/:id/rescan', rescanFolder);
+
+  // 目录约定导入：第一层年份 / 第二层 YYYYMMDD+主题
+  fastify.post('/api/library/inspect', inspectLibrary);
+  fastify.post('/api/library/topics', listTopicsApi);
+  fastify.post('/api/library/import', importTopicsApi);
+  fastify.post('/api/library/rescan-year', rescanYearApi);
 
   fastify.get('/api/settings', getSettings);
   fastify.post('/api/settings', saveSettings);

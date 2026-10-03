@@ -1,8 +1,12 @@
 -- 受管理文件夹
 CREATE TABLE IF NOT EXISTS folders (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  path            TEXT NOT NULL UNIQUE,
-  alias           TEXT,
+  path            TEXT NOT NULL UNIQUE,           -- 第二层主题目录绝对路径
+  alias           TEXT,                           -- 显示名，默认 "YYYY / 目录名"
+  year            TEXT,                           -- 第一层年份 YYYY
+  topic           TEXT,                           -- 主题关键词（目录名去掉 YYYYMMDD 前缀）
+  event_date      TEXT,                           -- YYYY-MM-DD，由目录名 YYYYMMDD 解析
+  parent_path     TEXT,                           -- 第一层（年份）目录绝对路径
   added_at        TEXT NOT NULL,
   last_scan_at    TEXT,
   scan_status     TEXT NOT NULL DEFAULT 'pending', -- pending | scanning | done | failed
@@ -12,7 +16,6 @@ CREATE TABLE IF NOT EXISTS folders (
   gmt_create      TEXT NOT NULL,
   gmt_modified    TEXT NOT NULL
 );
-
 -- 媒体文件记录（照片 + 视频）
 CREATE TABLE IF NOT EXISTS media (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,

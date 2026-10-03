@@ -4,8 +4,12 @@ const db = require('./db');
 const config = require('./config');
 const meta = require('./util/meta');
 
-// jobId -> { cancelled: bool }
+// jobId -> { cancelled, queued, ... }（含排队中与运行中）
 const runningJobs = new Map();
+// 扫描队列：批量导入/全部重扫时逐个执行，避免并发池叠加打爆 IO
+const pendingQueue = [];
+let activeScans = 0;
+const MAX_CONCURRENT_SCANS = 1;
 
 function nowIso() {
   return new Date().toISOString();
@@ -228,17 +232,11 @@ function startScan(folderId) {
   const folder = db.prepare('SELECT * FROM folders WHERE id=?').get(folderId);
   if (!folder) throw new Error('文件夹不存在');
 
-  const cfgObj = config.load();
-  const ffprobeResolved = config.resolveFfprobe();
-  const imageExts = cfgObj.imageFormats;
-  const videoExts = cfgObj.videoFormats;
-  const ignoreDirs = cfgObj.ignoreDirs;
-
   const ts = nowIso();
   const jobId = db
     .prepare(
       `INSERT INTO scan_jobs (folder_id, status, started_at, total_count, processed, current_path, added, updated, failed, gmt_create, gmt_modified)
-       VALUES (?, 'running', ?, 0, 0, NULL, 0, 0, 0, ?, ?)`
+       VALUES (?, 'queued', ?, 0, 0, NULL, 0, 0, 0, ?, ?)`
     )
     .run(folderId, ts, ts, ts).lastInsertRowid;
 
@@ -249,6 +247,7 @@ function startScan(folderId) {
     folderId,
     folderPath: folder.path,
     cancelled: false,
+    queued: true,
     processed: 0,
     added: 0,
     updated: 0,
@@ -256,9 +255,45 @@ function startScan(folderId) {
     dirty: 0
   };
   runningJobs.set(jobId, job);
+  pendingQueue.push(job);
+  pump();
+  return jobId;
+}
 
-  // 异步执行，不阻塞调用方
-  (async () => {
+// 队列调度：空闲时取下一个任务执行
+function pump() {
+  while (activeScans < MAX_CONCURRENT_SCANS && pendingQueue.length) {
+    const job = pendingQueue.shift();
+    if (job.cancelled) continue;
+    job.queued = false;
+    activeScans++;
+    db.prepare("UPDATE scan_jobs SET status='running', gmt_modified=? WHERE id=?").run(nowIso(), job.jobId);
+    executeScan(job)
+      .catch(() => {})
+      .finally(() => {
+        activeScans--;
+        pump();
+      });
+  }
+}
+
+async function executeScan(job) {
+  {
+    const jobId = job.jobId;
+    const folderId = job.folderId;
+    const cfgObj = config.load();
+    const ffprobeResolved = config.resolveFfprobe();
+    const imageExts = cfgObj.imageFormats;
+    const videoExts = cfgObj.videoFormats;
+    const ignoreDirs = cfgObj.ignoreDirs;
+
+    if (job.cancelled) {
+      db.prepare("UPDATE scan_jobs SET status='cancelled', finished_at=?, message=?, gmt_modified=? WHERE id=?")
+        .run(nowIso(), '用户取消', nowIso(), jobId);
+      db.prepare("UPDATE folders SET scan_status='failed', gmt_modified=? WHERE id=?").run(nowIso(), folderId);
+      return;
+    }
+
     try {
       const files = [];
       walk(job.folderPath, ignoreDirs, imageExts, videoExts, files);
@@ -344,18 +379,29 @@ function startScan(folderId) {
     } finally {
       runningJobs.delete(jobId);
     }
-  })();
-
-  return jobId;
+  }
 }
 
 function cancelScan(jobId) {
   const job = runningJobs.get(jobId);
-  if (job) {
-    job.cancelled = true;
-    return true;
+  if (!job) return false;
+  job.cancelled = true;
+  // 仍在排队：直接出队并落库，无需等待
+  if (job.queued) {
+    const i = pendingQueue.indexOf(job);
+    if (i >= 0) pendingQueue.splice(i, 1);
+    const ts = nowIso();
+    db.prepare("UPDATE scan_jobs SET status='cancelled', finished_at=?, message=?, gmt_modified=? WHERE id=?")
+      .run(ts, '用户取消', ts, jobId);
+    db.prepare("UPDATE folders SET scan_status='failed', gmt_modified=? WHERE id=?").run(ts, job.folderId);
+    runningJobs.delete(jobId);
   }
-  return false;
+  return true;
+}
+
+// 队列状态（UI 展示用）
+function queueState() {
+  return { active: activeScans, pending: pendingQueue.length };
 }
 
 function cancelByFolder(folderId) {
@@ -364,4 +410,4 @@ function cancelByFolder(folderId) {
   }
 }
 
-module.exports = { startScan, cancelScan, cancelByFolder };
+module.exports = { startScan, cancelScan, cancelByFolder, queueState };

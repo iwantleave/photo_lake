@@ -3,48 +3,97 @@
   <div>
     <div class="crumb">Photo World / 文件夹</div>
     <h1 class="page-title">文件夹管理</h1>
-    <div class="page-sub">添加本机文件夹，系统将自动扫描并解析其中所有照片与视频</div>
+    <div class="page-sub">目录约定：第一层为年份（YYYY），第二层为「YYYYMMDD + 主题」，第二层下所有照片归属该主题</div>
   </div>
   <div class="actions">
-    <button class="btn" id="scroll-add">+ 添加文件夹</button>
+    <button class="btn ghost" id="jump-topic">跳到主题选择</button>
   </div>
 </div>
 <div class="content">
-  <div class="card pad" style="margin-bottom:28px">
-    <h2 style="font-size:15px;margin:0 0 16px">添加文件夹</h2>
-    <form id="add-form" class="form-grid">
-      <div class="field" style="flex:1;min-width:320px"><span>文件夹绝对路径</span><input type="text" id="f-path" placeholder="如 D:\Photos 或 /Users/me/Pictures" required></div>
-      <div class="field"><span>别名（可选）</span><input type="text" id="f-alias" placeholder="自定义显示名"></div>
-      <button type="submit" class="btn">添加并扫描</button>
+
+  <div class="card pad" style="margin-bottom:22px">
+    <h2 style="font-size:15px;margin:0 0 4px">① 选择年份（第一层）</h2>
+    <div class="muted" style="font-size:12.5px;margin-bottom:16px">
+      输入照片库根路径（如 <span class="mono">D:\照片</span>）或直接输入年份路径（如 <span class="mono">D:\照片\2026</span>）
+    </div>
+    <form id="inspect-form" class="form-grid">
+      <div class="field" style="flex:1;min-width:380px"><span>库路径 / 年份路径</span><input type="text" id="lib-path" placeholder="D:\照片 或 D:\照片\2026" required></div>
+      <button type="submit" class="btn">解析目录</button>
     </form>
-    <div id="add-msg" class="msg" style="margin-top:12px"></div>
+    <div id="inspect-msg" class="msg" style="margin-top:12px"></div>
+    <div id="year-area" style="display:none;margin-top:18px">
+      <div class="field"><span>年份（第一层目录）</span></div>
+      <div id="year-chips" class="chips"></div>
+    </div>
+  </div>
+
+  <div class="card pad" id="topic-card" style="margin-bottom:28px;display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px">
+      <h2 style="font-size:15px;margin:0">② 选择主题（第二层）</h2>
+      <div id="topic-meta" class="muted" style="font-size:12.5px"></div>
+    </div>
+    <div class="muted" style="font-size:12.5px;margin-bottom:14px">
+      勾选主题目录后导入，其下所有照片/视频将归入该主题
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <table class="tbl">
+        <thead><tr><th style="width:38px"></th><th>主题目录</th><th>日期</th><th>主题</th><th class="num">文件数</th><th>状态</th></tr></thead>
+        <tbody id="topic-rows"></tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn-sm" id="sel-all">全选</button>
+      <button class="btn-sm" id="sel-new">仅选未导入</button>
+      <button class="btn-sm" id="sel-none">清空</button>
+      <span class="muted" style="font-size:12.5px;margin-left:6px" id="sel-count">已选 0 个</span>
+      <button class="btn" id="do-import" style="margin-left:auto">导入选中并扫描</button>
+    </div>
+    <div id="import-msg" class="msg" style="margin-top:12px"></div>
   </div>
 
   <div class="section">
-    <div class="section-head"><h2>已管理文件夹</h2></div>
-    <div class="card">
-      <table class="tbl">
-        <thead><tr><th>ID</th><th>路径</th><th>别名</th><th>图片</th><th>视频</th><th>实况</th><th>扫描状态</th><th>最后扫描</th><th></th></tr></thead>
-        <tbody id="folder-rows">
-        <% folders.forEach(function(f){ %>
-          <tr data-id="<%= f.id %>">
-            <td class="num"><%= f.id %></td>
-            <td class="mono"><%= f.path %></td>
-            <td><%= f.alias || '' %></td>
-            <td class="num"><%= f.image_count %></td>
-            <td class="num"><%= f.video_count %></td>
-            <td class="num"><%= f.livephoto_count %></td>
-            <td><span class="badge <%= f.scan_status %>"><%= f.scan_status %></span></td>
-            <td><%= f.last_scan_at ? f.last_scan_at.slice(0,19).replace('T',' ') : '-' %></td>
-            <td class="ops">
-              <button class="btn-sm" data-act="rescan" data-id="<%= f.id %>">重扫</button>
-              <button class="btn-sm danger" data-act="remove" data-id="<%= f.id %>">移除</button>
-            </td>
-          </tr>
-        <% }); %>
-        </tbody>
-      </table>
-    </div>
+    <div class="section-head"><h2>已管理主题</h2><span class="muted" style="font-size:12.5px">共 <%= total %> 个主题</span></div>
+    <% if (total === 0) { %>
+      <div class="card pad"><p class="muted">尚未导入任何主题。按上方流程选择年份与主题即可。</p></div>
+    <% } else { %>
+      <% groups.forEach(function(g){ %>
+        <div class="card" style="margin-bottom:16px">
+          <div class="filter-head">
+            <div class="title">
+              <%= g.year %>
+              <span class="muted" style="font-weight:400;font-size:12.5px">
+                <%= g.folders.length %> 个主题 · 图片 <%= g.images %> · 视频 <%= g.videos %> · 实况 <%= g.live %>
+              </span>
+            </div>
+            <div class="tools">
+              <button class="btn-sm" data-act="rescan-year" data-year="<%= g.year %>">重扫该年</button>
+            </div>
+          </div>
+          <table class="tbl">
+            <thead><tr><th>ID</th><th>主题目录</th><th>日期</th><th>主题</th><th class="num">图片</th><th class="num">视频</th><th class="num">实况</th><th>扫描状态</th><th>最后扫描</th><th></th></tr></thead>
+            <tbody>
+            <% g.folders.forEach(function(f){ %>
+              <tr data-id="<%= f.id %>">
+                <td class="num"><%= f.id %></td>
+                <td class="mono" title="<%= f.path %>"><%= f.dir_name %></td>
+                <td><%= f.event_date || '-' %></td>
+                <td><%= f.topic || '-' %></td>
+                <td class="num"><%= f.image_count %></td>
+                <td class="num"><%= f.video_count %></td>
+                <td class="num"><%= f.livephoto_count %></td>
+                <td><span class="badge <%= f.scan_status %>"><%= f.scan_status %></span></td>
+                <td><%= f.last_scan %></td>
+                <td class="ops">
+                  <button class="btn-sm" data-act="rescan" data-id="<%= f.id %>">重扫</button>
+                  <button class="btn-sm danger" data-act="remove" data-id="<%= f.id %>">移除</button>
+                </td>
+              </tr>
+            <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% }); %>
+    <% } %>
   </div>
 </div>
 <%- include('partials/foot') %>
@@ -57,29 +106,156 @@ async function api(method, url, body){
   if(!r.ok) throw new Error(data.error || ('HTTP '+r.status));
   return data;
 }
-const msg = document.getElementById('add-msg');
-document.getElementById('add-form').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  msg.textContent = '提交中…'; msg.className='msg';
+const $ = (id)=>document.getElementById(id);
+const esc = (s)=>String(s==null?'':s).replace(/[&<>"]/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let state = { mode:null, rootPath:'', year:null, yearPath:'', topics:[] };
+
+function setMsg(el, text, kind){ el.textContent = text; el.className = 'msg' + (kind ? ' ' + kind : ''); }
+
+function renderYears(res){
+  const area = $('year-area'), chips = $('year-chips');
+  chips.innerHTML = '';
+  if(res.mode === 'year'){
+    area.style.display = 'none';
+    renderTopics(res.year, res.year_path || res.path, res.topics);
+    return;
+  }
+  if(!res.years.length){
+    area.style.display = 'none';
+    renderTopics(res.year, res.year_path || res.path, res.topics);
+    return;
+  }
+  area.style.display = '';
+  res.years.forEach((y)=>{
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.dataset.path = y.path;
+    b.innerHTML = esc(y.year) + ' <span class="chip-meta">' + y.topic_count + ' 个主题' + (y.managed_count ? ' · 已导入 ' + y.managed_count : '') + '</span>';
+    b.addEventListener('click', ()=>pickYear(b, y));
+    chips.appendChild(b);
+  });
+}
+
+async function pickYear(btn, y){
+  [...$('year-chips').children].forEach((c)=>c.classList.remove('active'));
+  btn.classList.add('active');
+  setMsg($('inspect-msg'), '读取 ' + y.year + ' 的主题目录…');
   try{
-    await api('POST','/api/folders',{ path: document.getElementById('f-path').value, alias: document.getElementById('f-alias').value });
-    msg.textContent = '已添加，扫描任务已启动。'; msg.className='msg ok';
-    setTimeout(()=>location.reload(), 600);
+    const r = await api('POST','/api/library/topics',{ path: y.path });
+    setMsg($('inspect-msg'), y.year + '：' + r.topics.length + ' 个主题目录', 'ok');
+    renderTopics(y.year, y.path, r.topics);
   }catch(err){
-    msg.textContent = err.message; msg.className='msg err';
+    setMsg($('inspect-msg'), err.message, 'err');
+  }
+}
+
+function renderTopics(year, yearPath, topics){
+  state.year = year || null;
+  state.yearPath = yearPath;
+  state.topics = topics || [];
+  const card = $('topic-card');
+  card.style.display = '';
+  $('topic-meta').textContent = (year ? year + ' · ' : '') + (yearPath || '');
+  const tb = $('topic-rows');
+  tb.innerHTML = '';
+  if(!state.topics.length){
+    tb.innerHTML = '<tr><td colspan="6" class="muted">该目录下没有找到主题子目录</td></tr>';
+  }
+  state.topics.forEach((t, i)=>{
+    const tr = document.createElement('tr');
+    const cnt = t.file_count + (t.count_truncated ? '+' : '');
+    tr.innerHTML =
+      '<td><input type="checkbox" class="topic-cb" data-i="' + i + '"' + (t.managed ? ' disabled' : '') + '></td>' +
+      '<td class="mono" title="' + esc(t.path) + '">' + esc(t.dir_name) + (t.name_ok ? '' : ' <span class="warn" title="目录名不符合 YYYYMMDD+主题 约定">⚠</span>') + '</td>' +
+      '<td>' + (t.event_date || '-') + '</td>' +
+      '<td>' + esc(t.topic || '-') + '</td>' +
+      '<td class="num">' + cnt + '</td>' +
+      '<td>' + (t.managed ? '<span class="badge ' + esc(t.scan_status || 'done') + '">已导入 · ' + esc(t.scan_status || '') + '</span>' : '<span class="muted">未导入</span>') + '</td>';
+    tb.appendChild(tr);
+  });
+  updateSelCount();
+  $('do-import').disabled = !state.topics.some((t)=>!t.managed);
+  card.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function updateSelCount(){
+  const n = [...document.querySelectorAll('.topic-cb:checked')].length;
+  $('sel-count').textContent = '已选 ' + n + ' 个';
+}
+
+$('topic-rows').addEventListener('change', (e)=>{ if(e.target.classList.contains('topic-cb')) updateSelCount(); });
+$('sel-all').addEventListener('click', ()=>{ document.querySelectorAll('.topic-cb:not([disabled])').forEach(c=>c.checked=true); updateSelCount(); });
+$('sel-none').addEventListener('click', ()=>{ document.querySelectorAll('.topic-cb').forEach(c=>c.checked=false); updateSelCount(); });
+$('sel-new').addEventListener('click', ()=>{
+  document.querySelectorAll('.topic-cb').forEach((c)=>{ c.checked = !c.disabled; });
+  updateSelCount();
+});
+
+$('inspect-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const msg = $('inspect-msg');
+  setMsg(msg, '解析中…');
+  $('year-area').style.display = 'none';
+  $('topic-card').style.display = 'none';
+  try{
+    const res = await api('POST','/api/library/inspect',{ path: $('lib-path').value });
+    state.mode = res.mode;
+    state.rootPath = res.path;
+    if(res.mode === 'root') setMsg(msg, '库根路径：找到 ' + res.years.length + ' 个年份目录，点击年份查看主题', 'ok');
+    else if(res.mode === 'year') setMsg(msg, '已识别为年份目录 ' + res.year, 'ok');
+    else setMsg(msg, '该路径不是年份目录，且下层没有 YYYY 目录，按普通目录处理', 'warn');
+    renderYears(res);
+  }catch(err){
+    setMsg(msg, err.message, 'err');
   }
 });
-document.getElementById('folder-rows').addEventListener('click', async (e)=>{
+
+$('do-import').addEventListener('click', async ()=>{
+  const msg = $('import-msg');
+  const picked = [...document.querySelectorAll('.topic-cb:checked')].map((c)=>state.topics[+c.dataset.i].path);
+  if(!picked.length){ setMsg(msg, '请先勾选至少一个主题目录', 'err'); return; }
+  setMsg(msg, '导入中…（' + picked.length + ' 个主题）');
+  $('do-import').disabled = true;
+  try{
+    const r = await api('POST','/api/library/import',{ year: state.year, year_path: state.yearPath, topics: picked });
+    const skip = r.skipped && r.skipped.length ? '，跳过 ' + r.skipped.length + ' 个（已存在或无效）' : '';
+    setMsg(msg, '已导入 ' + r.imported.length + ' 个主题，扫描任务已排队' + skip, 'ok');
+    setTimeout(()=>location.reload(), 1200);
+  }catch(err){
+    setMsg(msg, err.message, 'err');
+    $('do-import').disabled = false;
+  }
+});
+
+$('jump-topic').addEventListener('click', ()=>{
+  const card = $('topic-card');
+  if(card.style.display === 'none'){ setMsg($('inspect-msg'), '请先解析路径', 'err'); return; }
+  card.scrollIntoView({behavior:'smooth', block:'start'});
+});
+
+document.body.addEventListener('click', async (e)=>{
   const btn = e.target.closest('button[data-act]'); if(!btn) return;
-  const id = btn.dataset.id, act = btn.dataset.act;
+  const act = btn.dataset.act, id = btn.dataset.id;
   if(act==='rescan'){
-    await api('POST','/api/folders/'+id+'/rescan'); location.reload();
+    await api('POST','/api/folders/'+id+'/rescan');
+    location.reload();
   } else if(act==='remove'){
     if(!confirm('确认移除？仅删除系统记录，不删除磁盘文件。')) return;
-    await api('DELETE','/api/folders/'+id); location.reload();
+    await api('DELETE','/api/folders/'+id);
+    location.reload();
+  } else if(act==='rescan-year'){
+    const y = btn.dataset.year;
+    if(y === '未分类'){
+      // 无年份的目录：逐个重扫
+      const list = await (await fetch('/api/folders')).json();
+      for(const f of list.folders){ if(!f.year) await fetch('/api/folders/'+f.id+'/rescan',{method:'POST'}); }
+    } else {
+      await api('POST','/api/library/rescan-year',{ year: y });
+    }
+    location.reload();
   }
 });
-document.getElementById('scroll-add').addEventListener('click', ()=>document.getElementById('f-path').focus());
 </script>
 </body>
 </html>

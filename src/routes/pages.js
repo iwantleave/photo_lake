@@ -1,3 +1,4 @@
+const path = require('path');
 const db = require('../db');
 const config = require('../config');
 
@@ -31,7 +32,10 @@ async function registerPages(fastify) {
            )`
         )
         .get().waste || 0;
-    const folders = db.prepare('SELECT * FROM folders ORDER BY added_at DESC').all();
+    const folders = db
+      .prepare('SELECT * FROM folders ORDER BY year DESC, event_date DESC, path')
+      .all()
+      .map((f) => ({ ...f, dir_name: path.basename(f.path) }));
     const recentJobs = db.prepare('SELECT * FROM scan_jobs ORDER BY started_at DESC LIMIT 5').all();
     return reply.view('index', {
       stats: {
@@ -45,8 +49,28 @@ async function registerPages(fastify) {
   });
 
   fastify.get('/folders', async (req, reply) => {
-    const folders = db.prepare('SELECT * FROM folders ORDER BY added_at DESC').all();
-    return reply.view('folders', { folders });
+    const rows = db.prepare('SELECT * FROM folders ORDER BY year DESC, event_date DESC, path').all();
+    // 按年份分组（无年份的归入"未分类"）
+    const order = [];
+    const map = new Map();
+    for (const f of rows) {
+      const y = f.year || '未分类';
+      if (!map.has(y)) {
+        map.set(y, { year: y, folders: [], images: 0, videos: 0, live: 0 });
+        order.push(y);
+      }
+      const g = map.get(y);
+      g.folders.push({
+        ...f,
+        dir_name: path.basename(f.path),
+        last_scan: f.last_scan_at ? f.last_scan_at.slice(0, 19).replace('T', ' ') : '-'
+      });
+      g.images += f.image_count || 0;
+      g.videos += f.video_count || 0;
+      g.live += f.livephoto_count || 0;
+    }
+    const groups = order.map((y) => map.get(y));
+    return reply.view('folders', { groups, total: rows.length });
   });
 
   fastify.get('/media', async (req, reply) => {

@@ -27,11 +27,12 @@
     <% } else { %>
       <div class="card">
         <table class="tbl">
-          <thead><tr><th>路径</th><th>图片</th><th>视频</th><th>实况</th><th>扫描状态</th><th>最后扫描</th></tr></thead>
+          <thead><tr><th>年份</th><th>主题</th><th>图片</th><th>视频</th><th>实况</th><th>扫描状态</th><th>最后扫描</th></tr></thead>
           <tbody>
           <% folders.forEach(function(f){ %>
             <tr>
-              <td class="mono"><%= f.path %></td>
+              <td class="num"><%= f.year || '-' %></td>
+              <td class="mono" title="<%= f.path %>"><%= f.topic || f.dir_name %><% if(f.event_date){ %><span class="muted-2"> · <%= f.event_date %></span><% } %></td>
               <td class="num"><%= f.image_count %></td>
               <td class="num"><%= f.video_count %></td>
               <td class="num"><%= f.livephoto_count %></td>

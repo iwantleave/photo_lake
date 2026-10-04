@@ -1,0 +1,28 @@
+# Windows 批处理与脚本的换行必须为 CRLF，否则在 Windows 上可能无法正确执行。
+# cmd.exe 对 LF-only 的 .cmd 解析存在兼容问题，跨平台检出时需强制 CRLF。
+*.cmd    text eol=crlf
+*.cmd.tpl text eol=crlf
+
+# 文本文件统一按 LF 存储（仓库内），检出时由上面规则决定换行
+*.js     text eol=lf
+*.json   text eol=lf
+*.sql    text eol=lf
+*.ejs    text eol=lf
+*.css    text eol=lf
+*.md     text eol=lf
+
+# 二进制文件，禁止换行转换
+*.db     binary
+*.db-wal binary
+*.db-shm binary
+*.jpg    binary
+*.jpeg   binary
+*.png    binary
+*.heic   binary
+*.heif   binary
+*.webp   binary
+*.gif    binary
+*.mp4    binary
+*.mov    binary
+*.m4v    binary
+*.avi    binary

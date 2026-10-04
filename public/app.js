@@ -239,12 +239,19 @@
     const body = document.getElementById('media-body');
     const meta = document.getElementById('table-meta');
     const pageinfo = document.getElementById('pageinfo');
+    const urlFolders = new URLSearchParams(location.search).get('folder_ids');
 
     api('/api/media/facets').then((f) => {
       fillSelect(document.getElementById('f-folder'), f.folders.map((x) => ({ v: x.id, t: x.alias || x.path })));
       fillSelect(document.getElementById('f-format'), f.formats.map((x) => ({ v: x, t: x })));
       fillSelect(document.getElementById('f-make'), f.makes.map((x) => ({ v: x, t: x })), true);
       fillSelect(document.getElementById('f-model'), f.models.map((x) => ({ v: x, t: x })), true);
+      // 从侧栏「主题」树点击进入时，按 URL 中的 folder_ids 预选文件夹筛选
+      if (urlFolders) {
+        const wanted = String(urlFolders).split(',');
+        [...document.getElementById('f-folder').options].forEach((o) => { o.selected = wanted.includes(o.value); });
+        load();
+      }
     });
 
     function fillSelect(sel, opts, withEmpty) {

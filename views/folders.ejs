@@ -167,7 +167,7 @@ function renderTopics(year, yearPath, topics){
     const cnt = t.file_count + (t.count_truncated ? '+' : '');
     tr.innerHTML =
       '<td><input type="checkbox" class="topic-cb" data-i="' + i + '"' + (t.managed ? ' disabled' : '') + '></td>' +
-      '<td class="mono" title="' + esc(t.path) + '">' + esc(t.dir_name) + (t.name_ok ? '' : ' <span class="warn" title="目录名不符合 YYYYMMDD+主题 约定">⚠</span>') + '</td>' +
+      '<td class="mono" title="' + esc(t.path) + '">' + esc(t.dir_name) + '</td>' +
       '<td>' + (t.event_date || '-') + '</td>' +
       '<td>' + esc(t.topic || '-') + '</td>' +
       '<td class="num">' + cnt + '</td>' +
@@ -248,8 +248,11 @@ document.body.addEventListener('click', async (e)=>{
     const y = btn.dataset.year;
     if(y === '未分类'){
       // 无年份的目录：逐个重扫
-      const list = await (await fetch('/api/folders')).json();
-      for(const f of list.folders){ if(!f.year) await fetch('/api/folders/'+f.id+'/rescan',{method:'POST'}); }
+      const r = await (await fetch('/api/folders')).json();
+      const list = Array.isArray(r) ? r : (r.folders || []);
+      let n = 0;
+      for(const f of list){ if(!f.year){ await fetch('/api/folders/'+f.id+'/rescan',{method:'POST'}); n++; } }
+      if(!n) setMsg($('inspect-msg'), '「未分类」分组下没有主题', 'warn');
     } else {
       await api('POST','/api/library/rescan-year',{ year: y });
     }

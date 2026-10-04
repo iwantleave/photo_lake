@@ -32,7 +32,7 @@
           <% folders.forEach(function(f){ %>
             <tr>
               <td class="num"><%= f.year || '-' %></td>
-              <td class="mono" title="<%= f.path %>"><%= f.topic || f.dir_name %><% if(f.event_date){ %><span class="muted-2"> · <%= f.event_date %></span><% } %></td>
+              <td class="mono" title="<%= f.path %>"><%= f.topic || f.path %></td>
               <td class="num"><%= f.image_count %></td>
               <td class="num"><%= f.video_count %></td>
               <td class="num"><%= f.livephoto_count %></td>
@@ -75,11 +75,14 @@
   function toast(m){ let t=document.getElementById('__toast'); if(!t){t=document.createElement('div');t.id='__toast';t.className='toast';document.body.appendChild(t);} t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
   document.getElementById('rescan-all').addEventListener('click', async ()=>{
     try{
-      const list = await (await fetch('/api/folders')).json();
+      const r = await fetch('/api/folders');
+      const d = await r.json();
+      const list = Array.isArray(d) ? d : (d.folders || []);
+      if(!list.length){ toast('没有可扫描的文件夹'); return; }
       let n=0;
       for(const f of list){ await fetch('/api/folders/'+f.id+'/rescan',{method:'POST'}); n++; }
       toast('已触发 '+n+' 个文件夹的重新扫描');
-    }catch(e){ toast('触发失败'); }
+    }catch(e){ toast('触发失败: '+(e.message||e)); }
   });
 </script>
 </body>

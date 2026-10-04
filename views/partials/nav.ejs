@@ -33,6 +33,30 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v4h4"/></svg>
         任务</a>
     </nav>
+    <div x-data="{ open:true, tree:[], expanded:{}, async load(){ try{ const r=await fetch('/api/topics-tree'); const d=await r.json(); this.tree=d.tree||[]; }catch(e){ this.tree=[]; } }, toggle(y){ this.expanded[y]=!this.expanded[y]; } }" x-init="load()">
+      <div class="nav-group-label clickable" @click="open=!open">
+        <span>主题</span><span class="caret" x-text="open ? '▾' : '▸'"></span>
+      </div>
+      <div class="topic-tree" x-show="open" x-cloak>
+        <template x-for="grp in tree" :key="grp.year">
+          <div class="topic-group">
+            <div class="topic-year" @click.stop="toggle(grp.year)" :class="{collapsed:!expanded[grp.year]}">
+              <span class="caret" x-text="expanded[grp.year] ? '▾' : '▸'"></span>
+              <span class="ty" x-text="grp.year"></span>
+              <span class="tc" x-text="grp.folders.length"></span>
+            </div>
+            <div class="topic-leaves" x-show="expanded[grp.year]">
+              <template x-for="f in grp.folders" :key="f.id">
+                <a class="topic-leaf" :href="'/media?folder_ids=' + f.id" :title="f.alias || f.topic">
+                  <span class="tl-name" x-text="f.topic"></span>
+                </a>
+              </template>
+            </div>
+          </div>
+        </template>
+        <div class="topic-empty" x-show="tree.length === 0">暂无主题</div>
+      </div>
+    </div>
     <div class="nav-group-label">系统</div>
     <nav class="nav">
       <a href="/settings" class="<%= active==='settings'?'active':'' %>">

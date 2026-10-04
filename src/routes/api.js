@@ -22,19 +22,16 @@ async function addFolder(req, reply) {
   if (!fs.existsSync(full) || !fs.statSync(full).isDirectory())
     return reply.code(400).send({ error: '路径不存在或不是目录' });
 
-  const dup = db.prepare('SELECT id FROM folders WHERE path=?').get(full);
-  if (dup) return reply.code(400).send({ error: '该文件夹已添加' });
-
-  const all = db.prepare('SELECT id, path FROM folders').all();
-  for (const f of all) {
-    if (full.startsWith(f.path + path.sep) || full === f.path)
+  // 与 importTopics 共用同一套重叠检测，避免两处逻辑漂移
+  const ov = library.detectOverlap(full, library.managedMap());
+  if (ov) {
+    if (ov.code === 'exact') return reply.code(400).send({ error: '该文件夹已添加' });
+    if (ov.code === 'child')
       return reply.code(400).send({ error: '该路径是已管理文件夹的子目录' });
-    if (f.path.startsWith(full + path.sep)) {
-      if (!force)
-        return reply
-          .code(409)
-          .send({ error: '部分文件会被重复管理（已有父目录被管理）', confirm: true, parentId: f.id });
-    }
+    if (!force)
+      return reply
+        .code(409)
+        .send({ error: '部分文件会被重复管理（已有子目录被管理）', confirm: true, parentId: ov.folder.id });
   }
 
   // 按「年份 / YYYYMMDD+主题」约定解析元信息
@@ -64,6 +61,32 @@ async function listFolders(req, reply) {
     .prepare('SELECT * FROM folders ORDER BY year DESC, event_date DESC, path')
     .all();
   return { folders: rows };
+}
+
+// 按「年份（第一层）→ 主题（第二层文件夹）」返回树状结构，供侧栏树展示
+async function topicsTree(req, reply) {
+  const rows = db
+    .prepare(
+      `SELECT id, year, topic, alias, image_count, video_count, livephoto_count, scan_status
+       FROM folders ORDER BY year DESC, event_date DESC, path`
+    )
+    .all();
+  const map = new Map();
+  for (const r of rows) {
+    const y = r.year || '未分类';
+    if (!map.has(y)) map.set(y, []);
+    map.get(y).push({
+      id: r.id,
+      topic: r.topic || r.alias || r.path,
+      alias: r.alias || null,
+      image_count: r.image_count || 0,
+      video_count: r.video_count || 0,
+      livephoto_count: r.livephoto_count || 0,
+      scan_status: r.scan_status
+    });
+  }
+  const tree = [...map.entries()].map(([year, folders]) => ({ year, folders }));
+  return { tree };
 }
 
 // ---------------- 按年份/主题约定的库导入 ----------------
@@ -211,14 +234,25 @@ function buildMediaQuery(query) {
   }
 
   // 状态处理（含 missing）
+  // 注意逻辑：不含 missing 时必须用 AND —— 若写成 OR，
+  // 「只勾选正常」会退化成 (scan_status='ok' OR is_missing=0)，
+  // 等价于「所有未丢失文件」，failed/degraded 全被混进来。
   if (statuses) {
     const st = String(statuses).split(',').filter(Boolean);
     const includeMissing = st.includes('missing');
     const scanSt = st.filter((s) => s !== 'missing');
-    const conds = [];
-    if (scanSt.length) { conds.push(`scan_status IN (${qmarks(scanSt.length)})`); params.push(...scanSt); }
-    conds.push(includeMissing ? 'is_missing = 1' : 'is_missing = 0');
-    where.push('(' + conds.join(' OR ') + ')');
+    if (scanSt.length && includeMissing) {
+      // 同时要「正常状态」和「已丢失」：前者必须限定未丢失，否则两者会互相串味
+      where.push(
+        `((scan_status IN (${qmarks(scanSt.length)}) AND is_missing = 0) OR is_missing = 1)`
+      );
+      params.push(...scanSt);
+    } else if (scanSt.length) {
+      where.push(`(scan_status IN (${qmarks(scanSt.length)}) AND is_missing = 0)`);
+      params.push(...scanSt);
+    } else {
+      where.push('is_missing = 1');
+    }
   } else {
     where.push('is_missing = 0');
   }
@@ -238,8 +272,11 @@ async function listMedia(req, reply) {
   const { where, params } = buildMediaQuery(q);
 
   const page = Math.max(1, parseInt(q.page, 10) || 1);
+  // 三层兜底：请求参数 -> 配置（config.load 已钳制）-> 白名单默认值。
+  // 缺了最后一层，pageSize=0 会得到 LIMIT 0（空表）且前端 total/ps 算出 Infinity。
   let pageSize = parseInt(q.pageSize, 10) || cfg.pageSize;
-  if (![20, 50, 100, 200].includes(pageSize)) pageSize = cfg.pageSize;
+  if (!config.PAGE_SIZE_ALLOWED.includes(pageSize)) pageSize = cfg.pageSize;
+  if (!config.PAGE_SIZE_ALLOWED.includes(pageSize)) pageSize = 50;
   const offset = (page - 1) * pageSize;
 
   let sort = SORT_WHITELIST.has(q.sort) ? q.sort : 'taken_at';
@@ -350,6 +387,7 @@ async function markMedia(req, reply) {
 
 async function registerApi(fastify) {
   fastify.get('/api/folders', listFolders);
+  fastify.get('/api/topics-tree', topicsTree);
   fastify.post('/api/folders', addFolder);
   fastify.delete('/api/folders/:id', removeFolder);
   fastify.post('/api/folders/:id/rescan', rescanFolder);

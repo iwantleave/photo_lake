@@ -12,6 +12,10 @@ config/
 
 # ===== Logs =====
 logs/
+*.log
+# 启动器运行时产生的临时标记文件
+logs/.server_started
+.node_abi_probe.js
 
 # ===== WorkBuddy project data (agent state, not source) =====
 .workbuddy/
@@ -19,7 +23,6 @@ logs/
 # ===== OS / editor =====
 .DS_Store
 Thumbs.db
-*.log
 
 # ===== Env =====
 .env

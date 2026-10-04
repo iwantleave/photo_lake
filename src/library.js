@@ -1,6 +1,6 @@
 // 按「年份 / YYYYMMDD+主题」约定的目录库管理：
 //   第一层：年份 YYYY          例 D:\照片\2026
-//   第二层：YYYYMMDD+主题      例 D:\照片\2026\20260101-过年
+//   第二层：文件夹「全名」即主题（不再截取日期前缀）  例 D:\照片\2026\20260101-过年
 // 一个第二层目录 = 一个受管理主题（folders 表一行），其下所有照片/视频归属该主题。
 
 const fs = require('fs');
@@ -56,6 +56,25 @@ function managedMap() {
     m.set(dirconv.key(f.path), f);
   }
   return m;
+}
+
+// 父子/同级重叠检测：新增受管目录前必须调用，否则会出现
+// 「D:\照片\2026」与「D:\照片\2026\20260101-过年」同时入库，
+// 扫描同一文件时 media 的 ON CONFLICT 会把 folder_id 改写成后扫的那个，
+// 导致父目录 image_count 失真、媒体归属错乱。
+// 返回 { code: 'exact' | 'child' | 'parent', folder }
+//   exact  = 完全相同（已存在）
+//   child  = 新路径是某已管目录的子目录
+//   parent = 新路径是某已管目录的父目录（会覆盖其管理范围）
+function detectOverlap(targetPath, managed) {
+  const target = dirconv.key(targetPath);
+  for (const entry of managed.values()) {
+    const k = dirconv.key(entry.path);
+    if (k === target) return { code: 'exact', folder: entry };
+    if (target.startsWith(k + path.sep)) return { code: 'child', folder: entry };
+    if (k.startsWith(target + path.sep)) return { code: 'parent', folder: entry };
+  }
+  return null;
 }
 
 function subDirs(dir, ignoreDirs) {
@@ -166,13 +185,27 @@ function importTopics(payload) {
       skipped.push({ path: abs, reason: '路径不存在或不是目录' });
       continue;
     }
-    const exist = managed.get(dirconv.key(abs));
-    if (exist) {
-      skipped.push({ path: abs, reason: '已在库中', folder_id: exist.id });
+    // 重叠检测（含同一批次内部的父子冲突，managed 会随导入实时更新）
+    const ov = detectOverlap(abs, managed);
+    if (ov) {
+      if (ov.code === 'exact') {
+        skipped.push({ path: abs, reason: '已在库中', folder_id: ov.folder.id });
+      } else if (ov.code === 'child') {
+        skipped.push({ path: abs, reason: `是已管理目录「${ov.folder.path}」的子目录`, folder_id: ov.folder.id });
+      } else {
+        skipped.push({
+          path: abs,
+          reason: `是已管理目录「${ov.folder.path}」的父目录，会与其管理范围重叠`,
+          folder_id: ov.folder.id
+        });
+      }
       continue;
     }
     const p = dirconv.parseFolderPath(abs);
-    const y = year || p.year || (path.basename(path.dirname(abs)) || null);
+    // 年份只在父目录确实是 YYYY 时才取，否则用目录名里的日期年份，
+    // 都没有则留空走「未分类」。否则 plain 模式下会把上级目录名
+    // （如 D:\照片\旅行 -> 「照片」）误当年份。
+    const y = year || p.year || null;
     const ts = nowIso();
     const id = db
       .prepare(
@@ -208,4 +241,12 @@ function rescanYear(year) {
   return { year: y, count: jobs.length, jobs };
 }
 
-module.exports = { inspect, listTopics, importTopics, rescanYear, countMedia };
+module.exports = {
+  inspect,
+  listTopics,
+  importTopics,
+  rescanYear,
+  countMedia,
+  managedMap,
+  detectOverlap
+};

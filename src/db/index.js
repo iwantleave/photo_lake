@@ -33,7 +33,8 @@ ensureColumn('folders', 'parent_path', 'TEXT');
 db.exec('CREATE INDEX IF NOT EXISTS idx_folders_year  ON folders(year)');
 db.exec('CREATE INDEX IF NOT EXISTS idx_folders_event ON folders(event_date)');
 
-// 回填历史数据：按新约定解析路径（不覆盖已存在的合法值）
+// 回填历史数据：把 topic 统一刷新为「文件夹全名」（修复旧库被截取日期前缀的主题名）；
+// 同时补全缺失的 year / event_date / parent_path / alias（不覆盖已有合法值）。
 (function backfillFolderMeta() {
   const dirconv = require('../util/dirconv');
   const rows = db.prepare('SELECT id, path, year, event_date, topic, parent_path, alias FROM folders').all();
@@ -42,11 +43,14 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_folders_event ON folders(event_date)');
   );
   const tx = db.transaction(() => {
     for (const r of rows) {
-      if (r.year && r.parent_path) continue;
       const p = dirconv.parseFolderPath(r.path);
-      if (!p.year && !p.event_date) continue;
-      const alias = r.alias || (p.year ? `${p.year} / ${p.dir_name}` : null);
-      stmt.run(p.year, p.topic, p.event_date, p.parent_path, alias, new Date().toISOString(), r.id);
+      const base = path.basename(r.path);
+      const topic = base; // 主题 = 文件夹全名，不截取日期
+      const year = r.year || p.year || null;
+      const parent_path = r.parent_path || p.parent_path || null;
+      const event_date = r.event_date || p.event_date || null;
+      const alias = r.alias || (year ? `${year} / ${base}` : null);
+      stmt.run(year, topic, event_date, parent_path, alias, new Date().toISOString(), r.id);
     }
   });
   tx();

@@ -16,18 +16,23 @@ function nowIso() {
 }
 
 // ---------- 递归遍历，收集图片/视频文件 ----------
-function walk(dir, ignoreDirs, imageExts, videoExts, out) {
+// 关键：目录读取失败时必须记录错误，不能静默返回空数组。
+// 否则「磁盘掉线 / 目录权限变更 / 移动硬盘未挂载」会被上层误判为
+// 「目录已空」，进而把该文件夹下所有 media 标记为 is_missing=1。
+// errors 元素：{ dir, code, message }
+function walk(dir, ignoreDirs, imageExts, videoExts, out, errors) {
   let entries;
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch (e) {
+    errors.push({ dir, code: e.code || 'EREADDIR', message: e.message || String(e) });
     return;
   }
   for (const e of entries) {
     const full = path.join(dir, e.name);
     if (e.isDirectory()) {
       if (ignoreDirs.includes(e.name)) continue;
-      walk(full, ignoreDirs, imageExts, videoExts, out);
+      walk(full, ignoreDirs, imageExts, videoExts, out, errors);
     } else if (e.isFile()) {
       const ext = e.name.includes('.') ? e.name.split('.').pop().toLowerCase() : '';
       if (imageExts.includes(ext)) out.push({ file: full, type: 'image', ext });
@@ -79,6 +84,9 @@ const stmtUpdateFolder = db.prepare(
   'UPDATE folders SET scan_status=?, last_scan_at=?, image_count=?, video_count=?, livephoto_count=?, gmt_modified=? WHERE id=?'
 );
 const stmtSetLive = db.prepare('UPDATE media SET is_livephoto=? WHERE id=?');
+const stmtSetMissing = db.prepare(
+  'UPDATE media SET is_missing=1, missing_since=?, gmt_modified=? WHERE id=?'
+);
 
 // ---------- 处理单个文件 ----------
 async function processFile(item, folderId, job, cfgObj, ffprobeResolved) {
@@ -185,10 +193,15 @@ async function processFile(item, folderId, job, cfgObj, ffprobeResolved) {
 }
 
 // ---------- 并发池 ----------
+// limit 必须 >= 1：若为 0，for 循环不进入、Promise.all([]) 立即返回，
+// 结果是「processed=0 但 job 被标记 done」，随后 missing 检测会把整个
+// 文件夹误标为丢失。这里做兜底钳制，不依赖调用方传值正确。
 async function runPool(items, limit, job, workerFn) {
+  if (!items.length) return;
+  const n = Math.max(1, Math.min(Number(limit) || 1, items.length));
   let i = 0;
   const workers = [];
-  for (let w = 0; w < limit; w++) {
+  for (let w = 0; w < n; w++) {
     workers.push(
       (async () => {
         while (!job.cancelled && i < items.length) {
@@ -245,7 +258,8 @@ function startScan(folderId) {
   const job = {
     jobId,
     folderId,
-    folderPath: folder.path,
+    folderPath: folder.path,   // 文件夹根路径，全程不变
+    currentPath: null,         // 当前处理的文件，仅用于进度展示
     cancelled: false,
     queued: true,
     processed: 0,
@@ -295,8 +309,18 @@ async function executeScan(job) {
     }
 
     try {
+      // 扫描前先确认根目录可读：目录不存在/不可访问时直接失败，
+      // 绝不能让它走到 missing 检测把整个文件夹标记为「文件丢失」。
+      try {
+        const stRoot = fs.statSync(job.folderPath);
+        if (!stRoot.isDirectory()) throw new Error('不是目录');
+      } catch (e) {
+        throw new Error(`文件夹不可访问（${job.folderPath}）：${e.message || e}`);
+      }
+
       const files = [];
-      walk(job.folderPath, ignoreDirs, imageExts, videoExts, files);
+      const walkErrors = [];
+      walk(job.folderPath, ignoreDirs, imageExts, videoExts, files, walkErrors);
       const total = files.length;
       db.prepare('UPDATE scan_jobs SET total_count=? WHERE id=?').run(total, jobId);
 
@@ -307,14 +331,14 @@ async function executeScan(job) {
 
       const persist = () => {
         stmtUpdateJob.run(
-          job.processed, job.folderPath, job.added, job.updated, job.failed, nowIso(), jobId
+          job.processed, job.currentPath || job.folderPath, job.added, job.updated, job.failed, nowIso(), jobId
         );
       };
 
       // 图片池（sharp/exifr 并发）
       await runPool(imageFiles, cfgObj.imageConcurrency, job, async (item) => {
         if (job.cancelled) return;
-        job.folderPath = item.file; // current_path 近似
+        job.currentPath = item.file;
         await processFile(item, folderId, job, cfgObj, ffprobeResolved);
         job.processed++;
         job.dirty++;
@@ -324,7 +348,7 @@ async function executeScan(job) {
       // 视频池（ffprobe 并发）
       await runPool(videoFiles, cfgObj.ffprobeConcurrency, job, async (item) => {
         if (job.cancelled) return;
-        job.folderPath = item.file;
+        job.currentPath = item.file;
         await processFile(item, folderId, job, cfgObj, ffprobeResolved);
         job.processed++;
         job.dirty++;
@@ -338,14 +362,32 @@ async function executeScan(job) {
         return;
       }
 
-      // missing 检测：db 有但本次不存在
+      // missing 检测：db 有但本次不存在。
+      // 仅当本次遍历「完整无错」时才允许执行 —— 只要有目录读不到，
+      // currentPaths 就是不完整的，拿它比对会把读不到的文件误判为丢失。
+      if (walkErrors.length) {
+        const sample = walkErrors
+          .slice(0, 3)
+          .map((e) => `${e.dir} (${e.code})`)
+          .join('; ');
+        const msg =
+          `有 ${walkErrors.length} 个目录无法读取，已跳过丢失检测以避免误标：${sample}` +
+          (walkErrors.length > 3 ? ' …' : '');
+        const endTs = nowIso();
+        persist();
+        db.prepare(
+          "UPDATE scan_jobs SET status='failed', finished_at=?, message=?, gmt_modified=? WHERE id=?"
+        ).run(endTs, msg, endTs, jobId);
+        db.prepare("UPDATE folders SET scan_status='failed', gmt_modified=? WHERE id=?").run(endTs, folderId);
+        return;
+      }
+
       const rows = db.prepare('SELECT id, file_path, is_missing, missing_since FROM media WHERE folder_id=?').all(folderId);
       const missTs = nowIso();
       const tx = db.transaction(() => {
         for (const r of rows) {
           if (!currentPaths.has(r.file_path) && !r.is_missing) {
-            db.prepare('UPDATE media SET is_missing=1, missing_since=?, gmt_modified=? WHERE id=?')
-              .run(r.missing_since || missTs, missTs, r.id);
+            stmtSetMissing.run(r.missing_since || missTs, missTs, r.id);
           }
         }
       });

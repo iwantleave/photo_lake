@@ -1,6 +1,7 @@
-// 目录命名约定解析：第一层 = 年份 YYYY，第二层 = YYYYMMDD + 主题
-// 例：  D:\照片\2026\20260101-过年
-//        ^^^^^^ 年份层        ^^^^^^^^^^^^^^^ 主题层（日期 20260101 + 主题"过年"）
+// 目录命名约定解析：
+//   第一层（年份层）= 年份 YYYY，用于分组/归档，例 D:\照片\2026
+//   第二层（主题层）= 文件夹「全名」即主题，例 D:\照片\2026\20260101-过年
+//   约定变更：主题名 = 文件夹全名，不再截取/剥离日期前缀；日期仅解析为 event_date 作排序用。
 
 const path = require('path');
 
@@ -21,17 +22,20 @@ function isValidYmd(y, m, d) {
 }
 
 // 解析第二层目录名 -> { event_date, topic, ok }
-// ok=false 表示不符合 YYYYMMDD 约定（仍返回整名作为 topic，保证不丢数据）
+// 关键约定变更：topic 一律使用「文件夹全名」，不再从名称中剥离/截取日期前缀。
+//   - 例：目录 "20260101-过年" 的 topic = "20260101-过年"（整名），event_date 仍解析为 2026-01-01 仅用于排序。
+//   - 目录名不带日期前缀时（如 "旅行"），topic = 整名，event_date = null。
+// ok=true 仅表示目录名带有合法 YYYYMMDD 前缀（内部排序降级用），不再用于截断名称或弹出警告。
 function parseTopicName(name) {
   if (!name) return { event_date: null, topic: null, ok: false };
   const m = TOPIC_RE.exec(name);
   if (!m) return { event_date: null, topic: name, ok: false };
-  const [, y, mo, d, rest] = m;
+  const [, y, mo, d] = m;
   if (!isValidYmd(y, mo, d)) return { event_date: null, topic: name, ok: false };
-  const topic = (rest || '').trim();
+  // 使用文件夹全名作为主题；日期仅作为可选排序元数据，不再从名称中剥离
   return {
     event_date: `${y}-${mo}-${d}`,
-    topic: topic || null,
+    topic: name,
     ok: true
   };
 }

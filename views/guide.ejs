@@ -1,0 +1,72 @@
+<%- include('partials/nav', {active:'guide', title:'使用说明'}) %>
+<div class="topbar">
+  <div>
+    <div class="crumb">Photo World / 说明</div>
+    <h1 class="page-title">使用说明</h1>
+    <div class="page-sub">照片怎么放、文件夹怎么建、导入怎么走——三条规则说完</div>
+  </div>
+</div>
+<div class="content doc">
+
+  <section class="card pad">
+    <h2>1. 照片库的两层结构</h2>
+    <p class="muted">照片世界只读你自己的目录，不搬动、不重命名任何文件。只要目录按下面两层放，就能被识别成一个个「主题」。</p>
+    <div class="tree">
+      <div class="tree-row"><span class="tree-path">D:\照片\</span><span class="tree-tag">库根目录</span></div>
+      <div class="tree-row lv1"><span class="tree-path">2026\</span><span class="tree-tag">第一层：年份</span></div>
+      <div class="tree-row lv2"><span class="tree-path">20260101-过年\</span><span class="tree-tag">第二层：主题</span></div>
+      <div class="tree-row lv3"><span class="tree-path">IMG_0001.jpg</span><span class="tree-tag muted-2">照片 / 视频</span></div>
+      <div class="tree-row lv2"><span class="tree-path">20260501-杭州旅行\</span><span class="tree-tag">第二层：主题</span></div>
+      <div class="tree-row lv1"><span class="tree-path">2025\</span><span class="tree-tag">第一层：年份</span></div>
+      <div class="tree-row lv2"><span class="tree-path">20250128-过年\</span><span class="tree-tag">第二层：主题</span></div>
+    </div>
+    <table class="tbl doc-tbl">
+      <thead><tr><th style="width:90px">层级</th><th style="width:180px">命名</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>第一层</td><td class="mono">2026</td><td>四位年份，用来分组归档。不是四位数字的一律当普通目录跳过。</td></tr>
+        <tr><td>第二层</td><td class="mono">20260101-过年</td><td>一个主题 = 一个文件夹 = 库里的一条记录，其下所有照片归到该主题。</td></tr>
+        <tr><td>再往下</td><td class="muted">任意</td><td>第三层及以下不再细分，全部算作同一个主题的照片。</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card pad">
+    <h2>2. 主题文件夹怎么命名</h2>
+    <p class="muted">格式：<code>年月日 + 事件名</code>。日期写前面，名字一眼看懂就行。</p>
+    <div class="samples">
+      <div class="sample ok"><span class="mono">20260101-过年</span><span class="sample-note">推荐：短横线分隔</span></div>
+      <div class="sample ok"><span class="mono">20260101过年</span><span class="sample-note">也可以：不加分隔</span></div>
+      <div class="sample ok"><span class="mono">20260101_过年</span><span class="sample-note">下划线、空格、点都认</span></div>
+      <div class="sample"><span class="mono">旅行</span><span class="sample-note">不带日期也能导入，只是排在最前/最后</span></div>
+    </div>
+    <ul class="doc-list">
+      <li>日期必须是 <span class="mono">YYYYMMDD</span> 八位（<span class="mono">2026-01-01</span> 这种带横线的<b>不认</b>，要写成 <span class="mono">20260101</span>）。</li>
+      <li><b>主题名 = 文件夹全名</b>，日期前缀不会截掉，界面上显示的就是你看到的目录名。</li>
+      <li>日期只用来在本年份内排序，不影响显示名称。</li>
+      <li>同一年份下别建同名文件夹；跨年份同名（比如两年都有「过年」）没问题。</li>
+    </ul>
+  </section>
+
+  <section class="card pad">
+    <h2>3. 导入与日常维护</h2>
+    <ol class="steps">
+      <li><b>放好照片</b>：按上面的规则，把照片放进 <span class="mono">年份\日期+事件\</span> 目录。</li>
+      <li><b>打开「文件夹」页</b>：填库根目录（如 <span class="mono">D:\照片</span>）或直接填年份目录，点解析。</li>
+      <li><b>勾选主题</b>：列表里勾选要入库的文件夹，确认导入，系统会自动扫描并写入元数据。</li>
+      <li><b>看结果</b>：「媒体」页按主题浏览，「重复」页清理重复文件，「地图」页看 GPS 打点。</li>
+    </ol>
+    <div class="doc-note">
+      <b>维护要点</b>
+      <ul class="doc-list">
+        <li>往已有主题里加新照片后，在该主题上点<b>重新扫描</b>即可增量入库。</li>
+        <li>改了文件夹名（比如改事件名）后重新扫描，主题名和排序会同步更新。</li>
+        <li>扫描任务<b>串行执行</b>，一次只跑一个文件夹，大目录耐心等一下。</li>
+        <li>只移动/删除文件而不改库时，库里会标记「缺失」，重新扫描后自动清理。</li>
+      </ul>
+    </div>
+  </section>
+
+</div>
+<%- include('partials/foot') %>
+</body>
+</html>

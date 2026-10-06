@@ -90,6 +90,10 @@ async function registerPages(fastify) {
     return reply.view('jobs', {});
   });
 
+  fastify.get('/guide', async (req, reply) => {
+    return reply.view('guide', {});
+  });
+
   fastify.get('/settings', async (req, reply) => {
     const settings = config.load();
     const ffprobe = config.resolveFfprobe();
